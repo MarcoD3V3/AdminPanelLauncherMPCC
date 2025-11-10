@@ -1,5 +1,6 @@
 // Configuración del servidor
-const API_URL = 'http://localhost:3000/api'; // Cambia esto por la URL de tu servidor
+// Detectar automáticamente la URL del servidor (funciona en localhost y producción)
+const API_URL = window.location.origin + '/api';
 
 // Estado global
 let tokens = [];
