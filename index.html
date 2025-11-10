@@ -60,6 +60,9 @@
                 <button class="tab-btn" onclick="switchTab('logs')" data-tab="logs">
                     📋 Logs
                 </button>
+                <button class="tab-btn" onclick="switchTab('users')" data-tab="users">
+                    👥 Usuarios
+                </button>
             </div>
         </div>
 
@@ -146,10 +149,40 @@
                     <option value="TOKENS_EXPORTED">Exportación</option>
                     <option value="TOKENS_IMPORTED">Importación</option>
                     <option value="CONFIG_UPDATED">Cambios de configuración</option>
+                    <option value="USER_CREATED">Creación de usuarios</option>
+                    <option value="USER_DELETED">Eliminación de usuarios</option>
+                    <option value="USER_PASSWORD_CHANGED">Cambio de contraseñas</option>
+                    <option value="LOGIN_SUCCESS">Inicios de sesión</option>
+                    <option value="LOGIN_FAILED">Intentos de login fallidos</option>
                 </select>
             </div>
             <div class="logs-container" id="logs-container">
                 <!-- Los logs se cargarán aquí -->
+            </div>
+        </div>
+
+        <!-- Tab: Usuarios -->
+        <div id="tab-users" class="tab-content">
+            <div class="actions" style="margin-bottom: 20px;">
+                <button class="btn btn-primary" onclick="showCreateUserModal()">
+                    ➕ Crear Nuevo Usuario
+                </button>
+            </div>
+            <div class="tokens-table-container">
+                <table class="tokens-table">
+                    <thead>
+                        <tr>
+                            <th>Usuario</th>
+                            <th>Rol</th>
+                            <th>Fecha de Creación</th>
+                            <th>Creado Por</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="users-tbody">
+                        <!-- Los usuarios se cargarán aquí -->
+                    </tbody>
+                </table>
             </div>
         </div>
 
@@ -185,6 +218,36 @@
                     <strong>Vista previa:</strong> <span id="import-count">0</span> tokens detectados
                 </div>
                 <button class="btn btn-primary" onclick="confirmImport()">Importar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para crear usuario -->
+    <div id="create-user-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Crear Nuevo Usuario</h2>
+                <button class="close-btn" onclick="closeCreateUserModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <label>Nombre de usuario:</label>
+                <input type="text" id="new-username" class="token-input" placeholder="Usuario (mín. 3 caracteres)" autocomplete="off">
+                
+                <label style="margin-top: 15px;">Contraseña:</label>
+                <input type="password" id="new-password" class="token-input" placeholder="Contraseña (mín. 6 caracteres)" autocomplete="new-password">
+                
+                <label style="margin-top: 15px;">Rol:</label>
+                <select id="new-user-role" class="token-input">
+                    <option value="user">Usuario</option>
+                    <option value="admin">Administrador</option>
+                </select>
+                
+                <div id="create-user-error" class="token-error" style="display: none; margin-top: 10px;"></div>
+                <div id="create-user-success" class="token-success" style="display: none; margin-top: 10px;">
+                    ✅ Usuario creado exitosamente
+                </div>
+                
+                <button class="btn btn-primary" onclick="confirmCreateUser()" style="margin-top: 15px; width: 100%;">Crear Usuario</button>
             </div>
         </div>
     </div>

@@ -66,8 +66,10 @@ async function checkAuth() {
             if (header) {
                 const userInfo = document.createElement('div');
                 userInfo.style.cssText = 'position: absolute; top: 20px; right: 20px; color: #666;';
+                const roleBadge = user.role === 'admin' ? '👑 Admin' : '👤 Usuario';
                 userInfo.innerHTML = `
-                    <span>👤 ${user.username}</span>
+                    <span>${roleBadge} ${user.username}</span>
+                    ${user.role === 'admin' ? '<span style="margin-left: 10px; color: #667eea; font-size: 0.9em;">(Administrador)</span>' : ''}
                     <button onclick="logout()" style="margin-left: 10px; padding: 5px 10px; background: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer;">Cerrar Sesión</button>
                 `;
                 header.style.position = 'relative';
@@ -389,6 +391,8 @@ function switchTab(tabName) {
         loadStats();
     } else if (tabName === 'logs') {
         loadLogs();
+    } else if (tabName === 'users') {
+        loadUsers();
     }
 }
 
@@ -628,5 +632,193 @@ function renderLogs(logs) {
             <div class="log-timestamp">${formatDate(log.timestamp)} | IP: ${log.ip || 'Unknown'}</div>
         </div>
     `).join('');
+}
+
+// ==================== GESTIÓN DE USUARIOS ====================
+
+// Cargar usuarios
+async function loadUsers() {
+    try {
+        const response = await authenticatedFetch(`${API_URL}/users`);
+        if (!response.ok) throw new Error('Error al cargar usuarios');
+        
+        const users = await response.json();
+        renderUsers(users);
+    } catch (error) {
+        console.error('Error:', error);
+        if (error.message !== 'No autenticado' && error.message !== 'Sesión expirada') {
+            showNotification('Error al cargar usuarios: ' + error.message, 'error');
+        }
+    }
+}
+
+// Renderizar usuarios
+function renderUsers(users) {
+    const tbody = document.getElementById('users-tbody');
+    if (!tbody) return;
+    
+    if (users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px;">No hay usuarios disponibles</td></tr>';
+        return;
+    }
+    
+    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+    
+    tbody.innerHTML = users.map(user => {
+        const isCurrentUser = user.username === currentUser.username;
+        const isAdmin = user.role === 'admin';
+        
+        return `
+            <tr>
+                <td>
+                    <strong>${user.username}</strong>
+                    ${isCurrentUser ? ' <span style="color: #667eea;">(Tú)</span>' : ''}
+                </td>
+                <td>
+                    <span class="status-badge ${isAdmin ? 'status-available' : 'status-used'}">
+                        ${isAdmin ? '👑 Admin' : '👤 Usuario'}
+                    </span>
+                </td>
+                <td>${formatDate(user.createdAt)}</td>
+                <td>${user.createdBy || '-'}</td>
+                <td>
+                    ${!isCurrentUser ? `
+                        <button class="action-btn btn-info" onclick="changeUserPassword('${user.username}')" title="Cambiar contraseña">
+                            🔑
+                        </button>
+                        <button class="action-btn btn-danger" onclick="deleteUser('${user.username}')" title="Eliminar">
+                            🗑️
+                        </button>
+                    ` : '<span style="color: #999;">-</span>'}
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// Mostrar modal de crear usuario
+function showCreateUserModal() {
+    document.getElementById('create-user-modal').classList.add('show');
+    document.getElementById('new-username').value = '';
+    document.getElementById('new-password').value = '';
+    document.getElementById('new-user-role').value = 'user';
+    document.getElementById('create-user-error').style.display = 'none';
+    document.getElementById('create-user-success').style.display = 'none';
+}
+
+// Cerrar modal de crear usuario
+function closeCreateUserModal() {
+    document.getElementById('create-user-modal').classList.remove('show');
+}
+
+// Confirmar creación de usuario
+async function confirmCreateUser() {
+    const username = document.getElementById('new-username').value.trim();
+    const password = document.getElementById('new-password').value;
+    const role = document.getElementById('new-user-role').value;
+    const errorDiv = document.getElementById('create-user-error');
+    const successDiv = document.getElementById('create-user-success');
+    
+    if (!username || !password) {
+        errorDiv.textContent = 'Por favor, completa todos los campos';
+        errorDiv.style.display = 'block';
+        return;
+    }
+    
+    if (username.length < 3) {
+        errorDiv.textContent = 'El nombre de usuario debe tener al menos 3 caracteres';
+        errorDiv.style.display = 'block';
+        return;
+    }
+    
+    if (password.length < 6) {
+        errorDiv.textContent = 'La contraseña debe tener al menos 6 caracteres';
+        errorDiv.style.display = 'block';
+        return;
+    }
+    
+    try {
+        const response = await authenticatedFetch(`${API_URL}/users`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ username, password, role })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al crear usuario');
+        }
+        
+        const result = await response.json();
+        successDiv.style.display = 'block';
+        errorDiv.style.display = 'none';
+        
+        showNotification('Usuario creado exitosamente', 'success');
+        
+        setTimeout(() => {
+            closeCreateUserModal();
+            loadUsers();
+        }, 1500);
+    } catch (error) {
+        errorDiv.textContent = error.message;
+        errorDiv.style.display = 'block';
+        successDiv.style.display = 'none';
+    }
+}
+
+// Cambiar contraseña de usuario
+async function changeUserPassword(username) {
+    const newPassword = prompt(`Ingresa la nueva contraseña para ${username} (mín. 6 caracteres):`);
+    
+    if (!newPassword) return;
+    
+    if (newPassword.length < 6) {
+        showNotification('La contraseña debe tener al menos 6 caracteres', 'error');
+        return;
+    }
+    
+    try {
+        const response = await authenticatedFetch(`${API_URL}/users/${encodeURIComponent(username)}/change-password`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ newPassword })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al cambiar contraseña');
+        }
+        
+        showNotification('Contraseña actualizada exitosamente', 'success');
+    } catch (error) {
+        showNotification('Error: ' + error.message, 'error');
+    }
+}
+
+// Eliminar usuario
+async function deleteUser(username) {
+    if (!confirm(`¿Estás seguro de que quieres eliminar al usuario "${username}"?`)) {
+        return;
+    }
+    
+    try {
+        const response = await authenticatedFetch(`${API_URL}/users/${encodeURIComponent(username)}`, {
+            method: 'DELETE'
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al eliminar usuario');
+        }
+        
+        showNotification('Usuario eliminado exitosamente', 'success');
+        loadUsers();
+    } catch (error) {
+        showNotification('Error: ' + error.message, 'error');
+    }
 }
 

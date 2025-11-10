@@ -323,6 +323,165 @@ app.post('/api/auth/change-password', authenticateToken, apiLimiter, async (req,
     }
 });
 
+// Crear nuevo usuario (requiere autenticación y rol admin)
+app.post('/api/users', authenticateToken, apiLimiter, async (req, res) => {
+    try {
+        // Solo admins pueden crear usuarios
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ error: 'Solo los administradores pueden crear usuarios' });
+        }
+        
+        const { username, password, role = 'user' } = req.body;
+        const ip = getClientIp(req);
+        
+        if (!username || !password) {
+            return res.status(400).json({ error: 'Usuario y contraseña requeridos' });
+        }
+        
+        if (username.length < 3) {
+            return res.status(400).json({ error: 'El nombre de usuario debe tener al menos 3 caracteres' });
+        }
+        
+        if (password.length < 6) {
+            return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
+        }
+        
+        const validRoles = ['admin', 'user'];
+        if (!validRoles.includes(role)) {
+            return res.status(400).json({ error: 'Rol inválido. Roles válidos: admin, user' });
+        }
+        
+        const users = await loadUsers();
+        
+        // Verificar que el usuario no exista
+        if (users.find(u => u.username === username)) {
+            return res.status(400).json({ error: 'El usuario ya existe' });
+        }
+        
+        // Crear nuevo usuario
+        const newUser = {
+            username: username,
+            password: await bcrypt.hash(password, 10),
+            role: role,
+            createdAt: new Date().toISOString(),
+            createdBy: req.user.username
+        };
+        
+        users.push(newUser);
+        await saveUsers(users);
+        
+        await addLog('USER_CREATED', { username, role, createdBy: req.user.username }, ip);
+        
+        res.json({
+            success: true,
+            message: 'Usuario creado exitosamente',
+            user: {
+                username: newUser.username,
+                role: newUser.role,
+                createdAt: newUser.createdAt
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Obtener todos los usuarios (requiere autenticación y rol admin)
+app.get('/api/users', authenticateToken, apiLimiter, async (req, res) => {
+    try {
+        // Solo admins pueden ver usuarios
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ error: 'Solo los administradores pueden ver usuarios' });
+        }
+        
+        const users = await loadUsers();
+        
+        // No devolver las contraseñas
+        const safeUsers = users.map(u => ({
+            username: u.username,
+            role: u.role || 'user',
+            createdAt: u.createdAt,
+            createdBy: u.createdBy
+        }));
+        
+        res.json(safeUsers);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Eliminar usuario (requiere autenticación y rol admin)
+app.delete('/api/users/:username', authenticateToken, apiLimiter, async (req, res) => {
+    try {
+        // Solo admins pueden eliminar usuarios
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ error: 'Solo los administradores pueden eliminar usuarios' });
+        }
+        
+        const { username } = req.params;
+        const ip = getClientIp(req);
+        
+        // No permitir eliminar el propio usuario
+        if (username === req.user.username) {
+            return res.status(400).json({ error: 'No puedes eliminar tu propio usuario' });
+        }
+        
+        const users = await loadUsers();
+        const userIndex = users.findIndex(u => u.username === username);
+        
+        if (userIndex === -1) {
+            return res.status(404).json({ error: 'Usuario no encontrado' });
+        }
+        
+        users.splice(userIndex, 1);
+        await saveUsers(users);
+        
+        await addLog('USER_DELETED', { username, deletedBy: req.user.username }, ip);
+        
+        res.json({ success: true, message: 'Usuario eliminado exitosamente' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Cambiar contraseña de otro usuario (requiere autenticación y rol admin)
+app.post('/api/users/:username/change-password', authenticateToken, apiLimiter, async (req, res) => {
+    try {
+        // Solo admins pueden cambiar contraseñas de otros usuarios
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ error: 'Solo los administradores pueden cambiar contraseñas' });
+        }
+        
+        const { username } = req.params;
+        const { newPassword } = req.body;
+        const ip = getClientIp(req);
+        
+        if (!newPassword) {
+            return res.status(400).json({ error: 'Nueva contraseña requerida' });
+        }
+        
+        if (newPassword.length < 6) {
+            return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
+        }
+        
+        const users = await loadUsers();
+        const user = users.find(u => u.username === username);
+        
+        if (!user) {
+            return res.status(404).json({ error: 'Usuario no encontrado' });
+        }
+        
+        user.password = await bcrypt.hash(newPassword, 10);
+        await saveUsers(users);
+        
+        await addLog('USER_PASSWORD_CHANGED', { username, changedBy: req.user.username }, ip);
+        
+        res.json({ success: true, message: 'Contraseña actualizada exitosamente' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // ==================== RUTAS ====================
 
 // Obtener todos los tokens (requiere autenticación)
