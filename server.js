@@ -15,6 +15,7 @@ const HISTORY_FILE = path.join(__dirname, 'validation_history.json');
 const LOGS_FILE = path.join(__dirname, 'activity_logs.json');
 const CONFIG_FILE = path.join(__dirname, 'config.json');
 const USERS_FILE = path.join(__dirname, 'users.json');
+const SESSIONS_FILE = path.join(__dirname, 'sessions.json');
 const JWT_SECRET_FILE = path.join(__dirname, '.jwt_secret');
 
 // Cargar o generar JWT_SECRET de forma persistente
@@ -158,6 +159,109 @@ async function addLog(action, details, ip = null) {
     }
 }
 
+// ==================== GESTIÓN DE SESIONES ====================
+
+// Cargar sesiones activas
+async function loadSessions() {
+    try {
+        const data = await fs.readFile(SESSIONS_FILE, 'utf-8');
+        const sessions = JSON.parse(data);
+        // Filtrar sesiones expiradas (más de 7 días sin actividad)
+        const now = new Date();
+        const validSessions = sessions.filter(session => {
+            const lastActivity = new Date(session.lastActivity);
+            const daysSinceActivity = (now - lastActivity) / (1000 * 60 * 60 * 24);
+            return daysSinceActivity < 7;
+        });
+        // Si se eliminaron sesiones, guardar
+        if (validSessions.length !== sessions.length) {
+            await saveSessions(validSessions);
+        }
+        return validSessions;
+    } catch (error) {
+        await saveSessions([]);
+        return [];
+    }
+}
+
+// Guardar sesiones activas
+async function saveSessions(sessions) {
+    await fs.writeFile(SESSIONS_FILE, JSON.stringify(sessions, null, 2));
+}
+
+// Crear o actualizar sesión
+async function createOrUpdateSession(username, ip, token, userAgent = 'Unknown') {
+    try {
+        const sessions = await loadSessions();
+        const now = new Date().toISOString();
+        
+        // Buscar si ya existe una sesión para este usuario y token
+        const existingIndex = sessions.findIndex(s => 
+            s.username === username && s.token === token
+        );
+        
+        if (existingIndex !== -1) {
+            // Actualizar sesión existente
+            sessions[existingIndex].lastActivity = now;
+            sessions[existingIndex].ip = ip;
+            if (userAgent !== 'Unknown') {
+                sessions[existingIndex].userAgent = userAgent;
+            }
+        } else {
+            // Crear nueva sesión
+            sessions.push({
+                id: crypto.randomBytes(16).toString('hex'),
+                username: username,
+                token: token,
+                ip: ip,
+                startedAt: now,
+                lastActivity: now,
+                userAgent: userAgent
+            });
+        }
+        
+        await saveSessions(sessions);
+    } catch (error) {
+        console.error('Error al crear/actualizar sesión:', error);
+    }
+}
+
+// Actualizar última actividad de una sesión
+async function updateSessionActivity(token) {
+    try {
+        const sessions = await loadSessions();
+        const session = sessions.find(s => s.token === token);
+        if (session) {
+            session.lastActivity = new Date().toISOString();
+            await saveSessions(sessions);
+        }
+    } catch (error) {
+        console.error('Error al actualizar actividad de sesión:', error);
+    }
+}
+
+// Eliminar sesión
+async function removeSession(sessionId) {
+    try {
+        const sessions = await loadSessions();
+        const filtered = sessions.filter(s => s.id !== sessionId);
+        await saveSessions(filtered);
+    } catch (error) {
+        console.error('Error al eliminar sesión:', error);
+    }
+}
+
+// Eliminar todas las sesiones de un usuario
+async function removeUserSessions(username) {
+    try {
+        const sessions = await loadSessions();
+        const filtered = sessions.filter(s => s.username !== username);
+        await saveSessions(filtered);
+    } catch (error) {
+        console.error('Error al eliminar sesiones de usuario:', error);
+    }
+}
+
 // Cargar configuración
 async function loadConfig() {
     try {
@@ -245,11 +349,16 @@ function authenticateToken(req, res, next) {
         return res.status(401).json({ error: 'Token de acceso requerido' });
     }
     
-    jwt.verify(token, JWT_SECRET, (err, user) => {
+    jwt.verify(token, JWT_SECRET, async (err, user) => {
         if (err) {
             return res.status(403).json({ error: 'Token inválido o expirado' });
         }
         req.user = user;
+        req.token = token;
+        
+        // Actualizar última actividad de la sesión
+        await updateSessionActivity(token);
+        
         next();
     });
 }
@@ -294,6 +403,10 @@ app.post('/api/auth/login', apiLimiter, async (req, res) => {
             JWT_SECRET,
             { expiresIn: '7d' } // Token válido por 7 días
         );
+        
+        // Crear o actualizar sesión
+        const userAgent = req.headers['user-agent'] || 'Unknown';
+        await createOrUpdateSession(user.username, ip, token, userAgent);
         
         await addLog('LOGIN_SUCCESS', { username: user.username, ip }, ip);
         
@@ -909,6 +1022,61 @@ app.put('/api/config', authenticateToken, apiLimiter, async (req, res) => {
         await addLog('CONFIG_UPDATED', { changes: newConfig }, ip);
         
         res.json({ success: true, config: updatedConfig });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ==================== RUTAS DE SESIONES ====================
+
+// Obtener todas las sesiones activas (requiere autenticación y rol admin)
+app.get('/api/sessions', authenticateToken, apiLimiter, async (req, res) => {
+    try {
+        // Solo admins pueden ver sesiones
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ error: 'Solo los administradores pueden ver sesiones' });
+        }
+        
+        const sessions = await loadSessions();
+        res.json(sessions);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Revocar una sesión específica (requiere autenticación y rol admin)
+app.delete('/api/sessions/:sessionId', authenticateToken, apiLimiter, async (req, res) => {
+    try {
+        // Solo admins pueden revocar sesiones
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ error: 'Solo los administradores pueden revocar sesiones' });
+        }
+        
+        const { sessionId } = req.params;
+        const ip = getClientIp(req);
+        
+        await removeSession(sessionId);
+        await addLog('SESSION_REVOKED', { sessionId, revokedBy: req.user.username }, ip);
+        
+        res.json({ success: true, message: 'Sesión revocada exitosamente' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Revocar todas las sesiones (requiere autenticación y rol admin)
+app.delete('/api/sessions', authenticateToken, apiLimiter, async (req, res) => {
+    try {
+        // Solo admins pueden revocar todas las sesiones
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ error: 'Solo los administradores pueden revocar sesiones' });
+        }
+        
+        const ip = getClientIp(req);
+        await saveSessions([]);
+        await addLog('ALL_SESSIONS_REVOKED', { revokedBy: req.user.username }, ip);
+        
+        res.json({ success: true, message: 'Todas las sesiones revocadas exitosamente' });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

@@ -493,14 +493,43 @@ function renderSessions(sessions) {
 }
 
 async function revokeSession(sessionId) {
-    // Implementar cuando el endpoint esté disponible
-    showNotification('Sesión revocada', 'success');
+    if (!confirm('¿Estás seguro de revocar esta sesión?')) return;
+    
+    try {
+        const response = await authenticatedFetch(`${API_URL}/sessions/${sessionId}`, {
+            method: 'DELETE'
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al revocar sesión');
+        }
+        
+        showNotification('Sesión revocada exitosamente', 'success');
+        loadSessions();
+    } catch (error) {
+        showNotification('Error: ' + error.message, 'error');
+    }
 }
 
 async function revokeAllSessions() {
-    if (!confirm('¿Estás seguro de revocar todas las sesiones?')) return;
-    // Implementar cuando el endpoint esté disponible
-    showNotification('Todas las sesiones revocadas', 'success');
+    if (!confirm('¿Estás seguro de revocar todas las sesiones? Esto cerrará la sesión de todos los usuarios.')) return;
+    
+    try {
+        const response = await authenticatedFetch(`${API_URL}/sessions`, {
+            method: 'DELETE'
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al revocar sesiones');
+        }
+        
+        showNotification('Todas las sesiones revocadas exitosamente', 'success');
+        loadSessions();
+    } catch (error) {
+        showNotification('Error: ' + error.message, 'error');
+    }
 }
 
 async function loadAlerts() {
