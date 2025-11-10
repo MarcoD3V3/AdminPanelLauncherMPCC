@@ -191,26 +191,64 @@ async function saveSessions(sessions) {
 // Crear o actualizar sesión
 async function createOrUpdateSession(username, token, ip, userAgent) {
     const sessions = await loadSessions();
-    const existingIndex = sessions.findIndex(s => s.username === username && s.token === token);
     
+    // Buscar sesión existente por token (sesión actual)
+    let existingIndex = sessions.findIndex(s => s.token === token && s.active);
+    
+    // Si no existe por token, buscar por username (para actualizar sesión existente del mismo usuario)
+    if (existingIndex === -1) {
+        existingIndex = sessions.findIndex(s => s.username === username && s.active);
+        
+        // Si encontramos una sesión activa del mismo usuario, revocarla primero
+        if (existingIndex >= 0) {
+            sessions[existingIndex].active = false;
+            sessions[existingIndex].revokedAt = new Date().toISOString();
+            sessions[existingIndex].revokedReason = 'Nueva sesión iniciada';
+        }
+    }
+    
+    // Crear nueva sesión con el nuevo token
     const sessionData = {
-        id: existingIndex >= 0 ? sessions[existingIndex].id : crypto.randomBytes(16).toString('hex'),
+        id: existingIndex >= 0 && sessions[existingIndex].token === token 
+            ? sessions[existingIndex].id 
+            : crypto.randomBytes(16).toString('hex'),
         username: username,
         token: token,
         ip: ip,
         userAgent: userAgent || 'Unknown',
-        startedAt: existingIndex >= 0 ? sessions[existingIndex].startedAt : new Date().toISOString(),
+        startedAt: existingIndex >= 0 && sessions[existingIndex].token === token
+            ? sessions[existingIndex].startedAt 
+            : new Date().toISOString(),
         lastActivity: new Date().toISOString(),
         active: true
     };
     
-    if (existingIndex >= 0) {
+    // Si existe y es el mismo token, actualizar
+    if (existingIndex >= 0 && sessions[existingIndex].token === token) {
         sessions[existingIndex] = sessionData;
     } else {
+        // Agregar nueva sesión
         sessions.push(sessionData);
     }
     
-    await saveSessions(sessions);
+    // Limpiar sesiones inactivas antiguas (más de 7 días sin actividad)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    const cleanedSessions = sessions.filter(s => {
+        if (!s.active) {
+            // Mantener sesiones revocadas solo por 1 día
+            if (s.revokedAt) {
+                const revokedDate = new Date(s.revokedAt);
+                return revokedDate > sevenDaysAgo;
+            }
+            return false;
+        }
+        // Mantener sesiones activas
+        return true;
+    });
+    
+    await saveSessions(cleanedSessions);
     return sessionData;
 }
 
@@ -259,6 +297,22 @@ async function updateSessionActivity(token) {
     if (session) {
         session.lastActivity = new Date().toISOString();
         await saveSessions(sessions);
+    } else {
+        // Si no se encuentra la sesión, puede que el token sea nuevo
+        // Intentar decodificar el token para obtener el username
+        try {
+            const decoded = jwt.verify(token, JWT_SECRET);
+            // Buscar sesión activa del usuario y actualizarla
+            const userSession = sessions.find(s => s.username === decoded.username && s.active);
+            if (userSession) {
+                // Actualizar el token de la sesión existente
+                userSession.token = token;
+                userSession.lastActivity = new Date().toISOString();
+                await saveSessions(sessions);
+            }
+        } catch (error) {
+            // Token inválido, no hacer nada
+        }
     }
 }
 
@@ -1095,9 +1149,25 @@ app.get('/api/sessions', authenticateToken, apiLimiter, async (req, res) => {
         }
         
         const sessions = await loadSessions();
-        // Filtrar solo sesiones activas
+        
+        // Filtrar solo sesiones activas y limpiar duplicados
+        // Si un usuario tiene múltiples sesiones activas, mantener solo la más reciente
         const activeSessions = sessions.filter(s => s.active);
-        res.json(activeSessions);
+        
+        // Agrupar por usuario y mantener solo la sesión más reciente de cada uno
+        const sessionsByUser = new Map();
+        activeSessions.forEach(session => {
+            const existing = sessionsByUser.get(session.username);
+            if (!existing || new Date(session.lastActivity) > new Date(existing.lastActivity)) {
+                sessionsByUser.set(session.username, session);
+            }
+        });
+        
+        // Convertir a array y ordenar por última actividad (más reciente primero)
+        const uniqueSessions = Array.from(sessionsByUser.values())
+            .sort((a, b) => new Date(b.lastActivity) - new Date(a.lastActivity));
+        
+        res.json(uniqueSessions);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
