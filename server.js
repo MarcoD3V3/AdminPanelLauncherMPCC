@@ -46,6 +46,10 @@ function loadOrCreateJWTSecret() {
 
 const JWT_SECRET = loadOrCreateJWTSecret();
 
+// Configurar Express para confiar en proxies (necesario para Railway, Render, Heroku, etc.)
+// Esto permite que express-rate-limit identifique correctamente las IPs de los clientes
+app.set('trust proxy', true);
+
 // Middleware de seguridad
 app.use(helmet({
     contentSecurityPolicy: false // Permitir scripts inline para el panel
