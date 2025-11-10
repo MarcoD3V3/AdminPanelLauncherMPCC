@@ -458,6 +458,11 @@ async function loadSessions() {
         if (response.ok) {
             const sessions = await response.json();
             renderSessions(sessions);
+            
+            // Auto-refrescar cada 30 segundos para actualizar estados online/offline
+            if (currentPageName === 'sessions') {
+                setTimeout(loadSessions, 30000);
+            }
         }
     } catch (error) {
         const tbody = document.getElementById('sessions-tbody');
@@ -490,10 +495,26 @@ function renderSessions(sessions) {
         const lastActivity = new Date(session.lastActivity);
         const now = new Date();
         const minutesAgo = Math.floor((now - lastActivity) / (1000 * 60));
-        const timeAgo = minutesAgo < 1 ? 'Ahora' : 
-                        minutesAgo < 60 ? `${minutesAgo} min` :
-                        Math.floor(minutesAgo / 60) < 24 ? `${Math.floor(minutesAgo / 60)} h` :
-                        `${Math.floor(minutesAgo / 1440)} días`;
+        const secondsAgo = Math.floor((now - lastActivity) / 1000);
+        
+        // Determinar si está online u offline
+        // Online si ha tenido actividad en los últimos 5 minutos
+        const isOnline = minutesAgo < 5;
+        const statusText = isOnline ? 'Online' : 'Offline';
+        const statusClass = isOnline ? 'tag-success' : 'tag-danger';
+        const statusIcon = isOnline ? '🟢' : '🔴';
+        
+        // Formatear tiempo transcurrido
+        let timeAgo;
+        if (secondsAgo < 60) {
+            timeAgo = `Hace ${secondsAgo} seg`;
+        } else if (minutesAgo < 60) {
+            timeAgo = `Hace ${minutesAgo} min`;
+        } else if (Math.floor(minutesAgo / 60) < 24) {
+            timeAgo = `Hace ${Math.floor(minutesAgo / 60)} h`;
+        } else {
+            timeAgo = `Hace ${Math.floor(minutesAgo / 1440)} días`;
+        }
         
         return `
         <tr>
@@ -511,10 +532,14 @@ function renderSessions(sessions) {
             <td>
                 ${formatDate(session.lastActivity)}
                 <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">
-                    Hace ${timeAgo}
+                    ${timeAgo}
                 </div>
             </td>
-            <td><span class="tag tag-success">Activa</span></td>
+            <td>
+                <span class="tag ${statusClass}">
+                    ${statusIcon} ${statusText}
+                </span>
+            </td>
             <td>
                 <button class="btn btn-sm btn-danger" onclick="revokeSession('${session.id}')">
                     <i class="fas fa-ban"></i> Revocar

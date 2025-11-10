@@ -177,7 +177,19 @@ async function loadSessions() {
         if (validSessions.length !== sessions.length) {
             await saveSessions(validSessions);
         }
-        return validSessions;
+        
+        // Agregar información de estado (online/offline) a cada sesión
+        return validSessions.map(session => {
+            const lastActivity = new Date(session.lastActivity);
+            const minutesAgo = (now - lastActivity) / (1000 * 60);
+            const isOnline = minutesAgo < 5; // Online si actividad en últimos 5 minutos
+            
+            return {
+                ...session,
+                isOnline: isOnline,
+                minutesSinceActivity: Math.floor(minutesAgo)
+            };
+        });
     } catch (error) {
         await saveSessions([]);
         return [];
