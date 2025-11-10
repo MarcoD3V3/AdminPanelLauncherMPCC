@@ -393,9 +393,14 @@
             <div id="page-sessions" class="page">
                 <div class="page-header">
                     <h2>Sesiones Activas</h2>
-                    <button class="btn btn-danger" onclick="revokeAllSessions()">
-                        <i class="fas fa-ban"></i> Revocar Todas
-                    </button>
+                    <div class="page-actions">
+                        <button class="btn btn-primary" onclick="showSendAlertToSessionModal()">
+                            <i class="fas fa-bell"></i> Enviar Alerta
+                        </button>
+                        <button class="btn btn-danger" onclick="revokeAllSessions()">
+                            <i class="fas fa-ban"></i> Revocar Todas
+                        </button>
+                    </div>
                 </div>
 
                 <div class="table-container">
@@ -451,7 +456,7 @@
             <div id="page-alerts" class="page">
                 <div class="page-header">
                     <h2>Alertas y Notificaciones</h2>
-                    <button class="btn btn-primary" onclick="createAlert()">
+                    <button class="btn btn-primary" onclick="showCreateAlertModal()">
                         <i class="fas fa-plus"></i> Crear Alerta
                     </button>
                 </div>
@@ -680,6 +685,33 @@
                     ✅ Usuario creado exitosamente
                 </div>
                 <button class="btn btn-primary" onclick="confirmCreateUser()">Crear Usuario</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para crear alerta -->
+    <div id="create-alert-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Crear Alerta</h2>
+                <button class="close-btn" onclick="closeCreateAlertModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <label>Título:</label>
+                <input type="text" id="alert-title" placeholder="Título de la alerta">
+                <label>Mensaje:</label>
+                <textarea id="alert-message" rows="4" placeholder="Mensaje de la alerta"></textarea>
+                <label>Usuario específico (opcional):</label>
+                <input type="text" id="alert-target-user" placeholder="Dejar vacío para todos los usuarios">
+                <label>Tipo:</label>
+                <select id="alert-type">
+                    <option value="info">Info</option>
+                    <option value="success">Éxito</option>
+                    <option value="warning">Advertencia</option>
+                    <option value="error">Error</option>
+                </select>
+                <div id="create-alert-error" class="error-message" style="display: none;"></div>
+                <button class="btn btn-primary" onclick="confirmCreateAlert()">Enviar Alerta</button>
             </div>
         </div>
     </div>

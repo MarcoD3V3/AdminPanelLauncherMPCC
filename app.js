@@ -382,22 +382,24 @@ async function loadRecentAlerts() {
     }
 }
 
-// Notificaciones
+// Notificaciones (usando alertas)
 async function loadNotifications() {
     try {
-        const response = await authenticatedFetch(`${API_URL}/notifications`);
+        const response = await authenticatedFetch(`${API_URL}/alerts`);
         if (response.ok) {
             notifications = await response.json();
             updateNotificationBadge();
             renderNotifications();
         }
     } catch (error) {
-        // Endpoint puede no existir aún
+        // Si falla, usar array vacío
+        notifications = [];
+        updateNotificationBadge();
     }
 }
 
 function updateNotificationBadge() {
-    const unread = notifications.filter(n => !n.read).length;
+    const unread = notifications.length; // Todas las alertas no leídas
     const badge = document.getElementById('notification-count');
     const alertsBadge = document.getElementById('alerts-badge');
     if (badge) badge.textContent = unread;
@@ -425,20 +427,36 @@ function renderNotifications() {
     
     list.innerHTML = notifications.map(notif => `
         <div class="notification-item ${!notif.read ? 'unread' : ''}" onclick="markNotificationAsRead('${notif.id}')">
-            <div style="font-weight: 600; margin-bottom: 4px;">${notif.title}</div>
+            <div style="font-weight: 600; margin-bottom: 4px;">${notif.title || 'Alerta'}</div>
             <div style="font-size: 0.9rem; color: var(--text-secondary);">${notif.message}</div>
-            <div style="font-size: 0.75rem; color: var(--text-tertiary); margin-top: 4px;">${formatDate(notif.timestamp)}</div>
+            <div style="font-size: 0.75rem; color: var(--text-tertiary); margin-top: 4px;">${formatDate(notif.createdAt || notif.timestamp)}</div>
         </div>
     `).join('');
 }
 
-function markNotificationAsRead(id) {
-    // Implementar cuando el endpoint esté disponible
+async function markNotificationAsRead(id) {
+    try {
+        const response = await authenticatedFetch(`${API_URL}/alerts/${id}/read`, {
+            method: 'POST'
+        });
+        if (response.ok) {
+            loadNotifications();
+        }
+    } catch (error) {
+        console.error('Error marking notification as read:', error);
+    }
 }
 
-function markAllAsRead() {
-    // Implementar cuando el endpoint esté disponible
-    showNotification('Todas las notificaciones marcadas como leídas', 'success');
+async function markAllAsRead() {
+    try {
+        for (const notif of notifications) {
+            await markNotificationAsRead(notif.id);
+        }
+        showNotification('Todas las notificaciones marcadas como leídas', 'success');
+        loadNotifications();
+    } catch (error) {
+        showNotification('Error al marcar notificaciones', 'error');
+    }
 }
 
 // Funciones adicionales para nuevas páginas
@@ -458,173 +476,16 @@ async function loadSessions() {
         if (response.ok) {
             const sessions = await response.json();
             renderSessions(sessions);
-            renderUsersFromSessions(sessions); // Renderizar vista de usuarios
-            
-            // Auto-refrescar cada 30 segundos para actualizar estados online/offline
-            if (currentPageName === 'sessions') {
-                setTimeout(loadSessions, 30000);
-            }
+        } else {
+            throw new Error('Error al cargar sesiones');
         }
     } catch (error) {
+        console.error('Error loading sessions:', error);
         const tbody = document.getElementById('sessions-tbody');
         if (tbody) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px;">No hay sesiones disponibles</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px; color: var(--text-secondary);">No hay sesiones activas</td></tr>';
         }
     }
-}
-
-// Renderizar vista de usuarios basada en sesiones
-function renderUsersFromSessions(sessions) {
-    // Filtrar solo sesiones del launcher (no del panel web)
-    const launcherSessions = sessions.filter(session => {
-        const isLauncher = session.userAgent && (
-            session.userAgent.includes('Launcher') || 
-            session.userAgent.includes('Minecraft-Launcher') ||
-            session.userAgent.includes('Electron')
-        );
-        return isLauncher;
-    });
-    
-    // Si no hay sesiones del launcher, no mostrar nada
-    if (launcherSessions.length === 0) {
-        const usersContainer = document.getElementById('users-sessions-container');
-        if (usersContainer) {
-            usersContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-secondary);">No hay usuarios del launcher activos</div>';
-        }
-        return;
-    }
-    
-    // Agrupar sesiones del launcher por usuario
-    const usersMap = {};
-    
-    launcherSessions.forEach(session => {
-        if (!usersMap[session.username]) {
-            usersMap[session.username] = {
-                username: session.username,
-                sessions: [],
-                isOnline: false,
-                lastActivity: null,
-                totalSessions: 0,
-                launcherSessions: 0,
-                ips: new Set()
-            };
-        }
-        
-        usersMap[session.username].sessions.push(session);
-        usersMap[session.username].totalSessions++;
-        usersMap[session.username].launcherSessions++;
-        if (session.ip) {
-            usersMap[session.username].ips.add(session.ip);
-        }
-        
-        // Determinar si el usuario está online (si alguna sesión está online)
-        if (session.isOnline) {
-            usersMap[session.username].isOnline = true;
-        }
-        
-        // Obtener la última actividad más reciente
-        const sessionLastActivity = new Date(session.lastActivity);
-        if (!usersMap[session.username].lastActivity || sessionLastActivity > new Date(usersMap[session.username].lastActivity)) {
-            usersMap[session.username].lastActivity = session.lastActivity;
-        }
-    });
-    
-    // Convertir a array y ordenar por última actividad
-    const users = Object.values(usersMap).sort((a, b) => {
-        return new Date(b.lastActivity) - new Date(a.lastActivity);
-    });
-    
-    // Buscar contenedor para usuarios o crear uno
-    let usersContainer = document.getElementById('users-sessions-container');
-    if (!usersContainer) {
-        // Crear contenedor si no existe
-        const sessionsPage = document.getElementById('page-sessions');
-        if (sessionsPage) {
-            const header = sessionsPage.querySelector('.page-header');
-            if (header) {
-                const container = document.createElement('div');
-                container.id = 'users-sessions-container';
-                container.style.cssText = 'margin-bottom: 30px;';
-                header.insertAdjacentElement('afterend', container);
-                usersContainer = container;
-            }
-        }
-    }
-    
-    if (!usersContainer) return;
-    
-    if (users.length === 0) {
-        usersContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-secondary);">No hay usuarios activos</div>';
-        return;
-    }
-    
-    // Calcular tiempo desde última actividad
-    const now = new Date();
-    
-    usersContainer.innerHTML = `
-        <div class="dashboard-card" style="margin-bottom: 20px;">
-            <div class="card-header">
-                <h3><i class="fas fa-users"></i> Usuarios del Launcher</h3>
-            </div>
-            <div class="card-body">
-                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px;">
-                    ${users.map(user => {
-                        const lastActivity = new Date(user.lastActivity);
-                        const minutesAgo = Math.floor((now - lastActivity) / (1000 * 60));
-                        const secondsAgo = Math.floor((now - lastActivity) / 1000);
-                        
-                        const timeAgo = secondsAgo < 60 ? `Hace ${secondsAgo} seg` :
-                                       minutesAgo < 60 ? `Hace ${minutesAgo} min` :
-                                       Math.floor(minutesAgo / 60) < 24 ? `Hace ${Math.floor(minutesAgo / 60)} h` :
-                                       `Hace ${Math.floor(minutesAgo / 1440)} días`;
-                        
-                        const statusIcon = user.isOnline ? '🟢' : '🔴';
-                        const statusText = user.isOnline ? 'Online' : 'Offline';
-                        const statusClass = user.isOnline ? 'tag-success' : 'tag-danger';
-                        
-                        return `
-                            <div style="background: var(--bg-secondary); border-radius: 12px; padding: 20px; border-left: 4px solid ${user.isOnline ? 'var(--success)' : 'var(--danger)'};">
-                                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
-                                    <div style="display: flex; align-items: center; gap: 10px;">
-                                        <div style="width: 40px; height: 40px; border-radius: 50%; background: ${user.isOnline ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
-                                            🎮
-                                        </div>
-                                        <div>
-                                            <div style="font-weight: 700; font-size: 1.1rem; color: var(--text-primary);">${user.username}</div>
-                                            <div style="font-size: 0.85rem; color: var(--text-secondary);">
-                                                ${user.totalSessions} sesión${user.totalSessions !== 1 ? 'es' : ''}
-                                                ${user.adminUsername && user.adminUsername !== user.username ? ` • Admin: ${user.adminUsername}` : ''}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <span class="tag ${statusClass}">
-                                        ${statusIcon} ${statusText}
-                                    </span>
-                                </div>
-                                
-                                <div style="display: flex; gap: 15px; margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color);">
-                                    <div style="flex: 1;">
-                                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px;">Sesiones Activas</div>
-                                        <div style="font-weight: 600; color: var(--text-primary);">🎮 ${user.launcherSessions}</div>
-                                    </div>
-                                    <div style="flex: 1;">
-                                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px;">IPs Diferentes</div>
-                                        <div style="font-weight: 600; color: var(--text-primary);">🌐 ${user.ips.size}</div>
-                                    </div>
-                                </div>
-                                
-                                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color);">
-                                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px;">Última Actividad</div>
-                                    <div style="font-size: 0.9rem; color: var(--text-primary);">${timeAgo}</div>
-                                    <div style="font-size: 0.75rem; color: var(--text-tertiary); margin-top: 4px;">${formatDate(user.lastActivity)}</div>
-                                </div>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            </div>
-        </div>
-    `;
 }
 
 function renderSessions(sessions) {
@@ -632,77 +493,27 @@ function renderSessions(sessions) {
     if (!tbody) return;
     
     if (sessions.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px;">No hay sesiones activas</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px; color: var(--text-secondary);">No hay sesiones activas</td></tr>';
         return;
     }
     
-    tbody.innerHTML = sessions.map(session => {
-        // Detectar si es sesión del launcher o del panel
-        const isLauncher = session.userAgent && (
-            session.userAgent.includes('Launcher') || 
-            session.userAgent.includes('Minecraft-Launcher') ||
-            session.userAgent.includes('Electron')
-        );
-        const sessionType = isLauncher ? 'Launcher' : 'Panel Web';
-        const sessionIcon = isLauncher ? '🎮' : '🌐';
-        
-        // Calcular tiempo desde última actividad
-        const lastActivity = new Date(session.lastActivity);
-        const now = new Date();
-        const minutesAgo = Math.floor((now - lastActivity) / (1000 * 60));
-        const secondsAgo = Math.floor((now - lastActivity) / 1000);
-        
-        // Determinar si está online u offline
-        // Online si ha tenido actividad en los últimos 5 minutos
-        const isOnline = minutesAgo < 5;
-        const statusText = isOnline ? 'Online' : 'Offline';
-        const statusClass = isOnline ? 'tag-success' : 'tag-danger';
-        const statusIcon = isOnline ? '🟢' : '🔴';
-        
-        // Formatear tiempo transcurrido
-        let timeAgo;
-        if (secondsAgo < 60) {
-            timeAgo = `Hace ${secondsAgo} seg`;
-        } else if (minutesAgo < 60) {
-            timeAgo = `Hace ${minutesAgo} min`;
-        } else if (Math.floor(minutesAgo / 60) < 24) {
-            timeAgo = `Hace ${Math.floor(minutesAgo / 60)} h`;
-        } else {
-            timeAgo = `Hace ${Math.floor(minutesAgo / 1440)} días`;
-        }
-        
-        return `
+    tbody.innerHTML = sessions.map(session => `
         <tr>
-            <td>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span>${sessionIcon}</span>
-                    <strong>${session.username}</strong>
-                </div>
-                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">
-                    ${sessionType}
-                </div>
-            </td>
-            <td>${session.ip || 'Unknown'}</td>
+            <td><strong>${session.username}</strong></td>
+            <td>${session.ip}</td>
             <td>${formatDate(session.startedAt)}</td>
+            <td>${formatDate(session.lastActivity)}</td>
+            <td><span class="tag tag-success">Activa</span></td>
             <td>
-                ${formatDate(session.lastActivity)}
-                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">
-                    ${timeAgo}
-                </div>
-            </td>
-            <td>
-                <span class="tag ${statusClass}">
-                    ${statusIcon} ${statusText}
-                </span>
-            </td>
-            <td>
-                <button class="btn btn-sm btn-danger" onclick="revokeSession('${session.id}')">
-                    <i class="fas fa-ban"></i> Revocar
+                <button class="btn btn-sm btn-primary" onclick="sendAlertToUser('${session.username}')" title="Enviar alerta">
+                    <i class="fas fa-bell"></i>
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="revokeSession('${session.id}')" title="Revocar sesión">
+                    <i class="fas fa-ban"></i>
                 </button>
             </td>
         </tr>
-    `;
-    }).join('');
+    `).join('');
 }
 
 async function revokeSession(sessionId) {
@@ -713,15 +524,14 @@ async function revokeSession(sessionId) {
             method: 'DELETE'
         });
         
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Error al revocar sesión');
+        if (response.ok) {
+            showNotification('Sesión revocada exitosamente', 'success');
+            loadSessions();
+        } else {
+            throw new Error('Error al revocar sesión');
         }
-        
-        showNotification('Sesión revocada exitosamente', 'success');
-        loadSessions();
     } catch (error) {
-        showNotification('Error: ' + error.message, 'error');
+        showNotification('Error al revocar sesión: ' + error.message, 'error');
     }
 }
 
@@ -733,25 +543,142 @@ async function revokeAllSessions() {
             method: 'DELETE'
         });
         
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Error al revocar sesiones');
+        if (response.ok) {
+            showNotification('Todas las sesiones revocadas exitosamente', 'success');
+            loadSessions();
+        } else {
+            throw new Error('Error al revocar sesiones');
         }
-        
-        showNotification('Todas las sesiones revocadas exitosamente', 'success');
-        loadSessions();
     } catch (error) {
-        showNotification('Error: ' + error.message, 'error');
+        showNotification('Error al revocar sesiones: ' + error.message, 'error');
     }
 }
 
 async function loadAlerts() {
-    // Implementar carga de alertas
+    try {
+        const response = await authenticatedFetch(`${API_URL}/alerts/all`);
+        if (response.ok) {
+            const alerts = await response.json();
+            renderAlerts(alerts);
+        }
+    } catch (error) {
+        console.error('Error loading alerts:', error);
+        const container = document.getElementById('alerts-container');
+        if (container) {
+            container.innerHTML = '<p style="text-align: center; padding: 40px; color: var(--text-secondary);">No hay alertas disponibles</p>';
+        }
+    }
 }
 
-function createAlert() {
-    // Implementar creación de alertas
-    showNotification('Funcionalidad en desarrollo', 'info');
+function renderAlerts(alerts) {
+    const container = document.getElementById('alerts-container');
+    if (!container) return;
+    
+    if (alerts.length === 0) {
+        container.innerHTML = '<p style="text-align: center; padding: 40px; color: var(--text-secondary);">No hay alertas</p>';
+        return;
+    }
+    
+    container.innerHTML = alerts.map(alert => `
+        <div class="alert-card alert-${alert.type}">
+            <div class="alert-header">
+                <h4>${alert.title}</h4>
+                <div class="alert-meta">
+                    <span>${alert.targetUser || 'Todos los usuarios'}</span>
+                    <span>${formatDate(alert.createdAt)}</span>
+                </div>
+            </div>
+            <div class="alert-body">
+                <p>${alert.message}</p>
+            </div>
+            <div class="alert-actions">
+                <button class="btn btn-sm btn-danger" onclick="deleteAlert('${alert.id}')">
+                    <i class="fas fa-trash"></i> Eliminar
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function showCreateAlertModal() {
+    document.getElementById('create-alert-modal').classList.add('show');
+    document.getElementById('alert-title').value = '';
+    document.getElementById('alert-message').value = '';
+    document.getElementById('alert-target-user').value = '';
+    document.getElementById('alert-type').value = 'info';
+    document.getElementById('create-alert-error').style.display = 'none';
+}
+
+function closeCreateAlertModal() {
+    document.getElementById('create-alert-modal').classList.remove('show');
+}
+
+function confirmCreateAlert() {
+    const title = document.getElementById('alert-title').value.trim();
+    const message = document.getElementById('alert-message').value.trim();
+    const targetUser = document.getElementById('alert-target-user').value.trim() || null;
+    const type = document.getElementById('alert-type').value;
+    const errorDiv = document.getElementById('create-alert-error');
+    
+    if (!title || !message) {
+        errorDiv.textContent = 'Por favor, completa título y mensaje';
+        errorDiv.style.display = 'block';
+        return;
+    }
+    
+    sendAlert(title, message, targetUser, type);
+    closeCreateAlertModal();
+}
+
+function sendAlertToUser(username) {
+    document.getElementById('create-alert-modal').classList.add('show');
+    document.getElementById('alert-title').value = '';
+    document.getElementById('alert-message').value = '';
+    document.getElementById('alert-target-user').value = username;
+    document.getElementById('alert-type').value = 'info';
+    document.getElementById('create-alert-error').style.display = 'none';
+}
+
+function showSendAlertToSessionModal() {
+    showCreateAlertModal();
+}
+
+async function sendAlert(title, message, targetUser, type = 'info') {
+    try {
+        const response = await authenticatedFetch(`${API_URL}/alerts`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, message, targetUser, type })
+        });
+        
+        if (response.ok) {
+            showNotification('Alerta enviada exitosamente', 'success');
+            loadAlerts();
+        } else {
+            throw new Error('Error al enviar alerta');
+        }
+    } catch (error) {
+        showNotification('Error al enviar alerta: ' + error.message, 'error');
+    }
+}
+
+async function deleteAlert(alertId) {
+    if (!confirm('¿Estás seguro de eliminar esta alerta?')) return;
+    
+    try {
+        const response = await authenticatedFetch(`${API_URL}/alerts/${alertId}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            showNotification('Alerta eliminada exitosamente', 'success');
+            loadAlerts();
+        } else {
+            throw new Error('Error al eliminar alerta');
+        }
+    } catch (error) {
+        showNotification('Error al eliminar alerta: ' + error.message, 'error');
+    }
 }
 
 async function loadSettings() {
@@ -1011,7 +938,7 @@ async function confirmGenerate() {
         showNotification(`${result.tokens.length} token(s) generado(s) exitosamente`, 'success');
         closeGenerateModal();
         if (currentPageName === 'tokens' || currentPageName === 'dashboard') {
-            loadTokens();
+        loadTokens();
         }
     } catch (error) {
         console.error('Error:', error);
@@ -1462,7 +1389,7 @@ function renderLogs(logs) {
             <div class="log-entry-header">
                 <div class="log-icon">
                     <i class="fas ${icon}"></i>
-                </div>
+        </div>
                 <div class="log-action-info">
                     <div class="log-action-name">${log.action}</div>
                     <div class="log-meta">
@@ -1490,18 +1417,7 @@ function renderLogs(logs) {
 async function loadUsers() {
     try {
         const response = await authenticatedFetch(`${API_URL}/users`);
-        
-        if (!response.ok) {
-            // Intentar leer el mensaje de error del servidor
-            let errorMessage = 'Error al cargar usuarios';
-            try {
-                const errorData = await response.json();
-                errorMessage = errorData.error || errorMessage;
-            } catch (e) {
-                // Si no se puede parsear el error, usar el mensaje por defecto
-            }
-            throw new Error(errorMessage);
-        }
+        if (!response.ok) throw new Error('Error al cargar usuarios');
         
         const users = await response.json();
         renderUsers(users);
@@ -1519,7 +1435,7 @@ function renderUsers(users) {
     if (!tbody) return;
     
     if (users.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px;">No hay usuarios disponibles</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px;">No hay usuarios disponibles</td></tr>';
         return;
     }
     
@@ -1542,7 +1458,6 @@ function renderUsers(users) {
                 </td>
                 <td>${formatDate(user.createdAt)}</td>
                 <td>${user.createdBy || '-'}</td>
-                <td>${user.lastAccess ? formatDate(user.lastAccess) : '-'}</td>
                 <td>
                     ${!isCurrentUser ? `
                         <button class="btn btn-sm btn-info" onclick="changeUserPassword('${user.username}')" title="Cambiar contraseña">
