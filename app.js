@@ -8,18 +8,100 @@ let currentPage = 1;
 let itemsPerPage = 20;
 let currentSort = { field: null, direction: 'asc' };
 let currentTab = 'tokens';
+let authToken = localStorage.getItem('authToken');
+
+// Función para hacer peticiones autenticadas
+async function authenticatedFetch(url, options = {}) {
+    if (!authToken) {
+        // Si no hay token, redirigir al login
+        window.location.href = 'login.html';
+        throw new Error('No autenticado');
+    }
+    
+    const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`,
+        ...options.headers
+    };
+    
+    const response = await fetch(url, { ...options, headers });
+    
+    // Si el token expiró o es inválido, redirigir al login
+    if (response.status === 401 || response.status === 403) {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('user');
+        window.location.href = 'login.html';
+        throw new Error('Sesión expirada');
+    }
+    
+    return response;
+}
+
+// Verificar autenticación al cargar
+async function checkAuth() {
+    if (!authToken) {
+        window.location.href = 'login.html';
+        return false;
+    }
+    
+    try {
+        const response = await fetch(`${API_URL}/auth/verify`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+        const data = await response.json();
+        
+        if (!data.valid) {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('user');
+            window.location.href = 'login.html';
+            return false;
+        }
+        
+        // Mostrar usuario actual
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        if (user.username) {
+            const header = document.querySelector('header');
+            if (header) {
+                const userInfo = document.createElement('div');
+                userInfo.style.cssText = 'position: absolute; top: 20px; right: 20px; color: #666;';
+                userInfo.innerHTML = `
+                    <span>👤 ${user.username}</span>
+                    <button onclick="logout()" style="margin-left: 10px; padding: 5px 10px; background: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer;">Cerrar Sesión</button>
+                `;
+                header.style.position = 'relative';
+                header.appendChild(userInfo);
+            }
+        }
+        
+        return true;
+    } catch (error) {
+        window.location.href = 'login.html';
+        return false;
+    }
+}
+
+// Cerrar sesión
+function logout() {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+    window.location.href = 'login.html';
+}
 
 // Inicializar
-document.addEventListener('DOMContentLoaded', () => {
-    loadTokens();
-    loadStats();
-    // Cargar historial y logs cuando se cambie de tab
+document.addEventListener('DOMContentLoaded', async () => {
+    const isAuthenticated = await checkAuth();
+    if (isAuthenticated) {
+        loadTokens();
+        loadStats();
+    }
 });
 
 // Cargar tokens desde el servidor
 async function loadTokens() {
     try {
-        const response = await fetch(`${API_URL}/tokens`);
+        const response = await authenticatedFetch(`${API_URL}/tokens`);
         if (!response.ok) throw new Error('Error al cargar tokens');
         
         tokens = await response.json();
@@ -27,13 +109,8 @@ async function loadTokens() {
         renderTokens();
     } catch (error) {
         console.error('Error:', error);
-        showNotification('Error al cargar tokens: ' + error.message, 'error');
-        // Cargar desde localStorage como fallback
-        const savedTokens = localStorage.getItem('tokens');
-        if (savedTokens) {
-            tokens = JSON.parse(savedTokens);
-            updateStats();
-            renderTokens();
+        if (error.message !== 'No autenticado' && error.message !== 'Sesión expirada') {
+            showNotification('Error al cargar tokens: ' + error.message, 'error');
         }
     }
 }
@@ -137,7 +214,7 @@ async function confirmGenerate() {
     const count = parseInt(document.getElementById('token-count').value) || 1;
     
     try {
-        const response = await fetch(`${API_URL}/tokens/generate`, {
+        const response = await authenticatedFetch(`${API_URL}/tokens/generate`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -179,7 +256,7 @@ async function deleteToken(token) {
     if (!confirm('¿Estás seguro de que quieres eliminar este token?')) return;
     
     try {
-        const response = await fetch(`${API_URL}/tokens/${encodeURIComponent(token)}`, {
+        const response = await authenticatedFetch(`${API_URL}/tokens/${encodeURIComponent(token)}`, {
             method: 'DELETE'
         });
         
@@ -198,7 +275,7 @@ async function clearUsedTokens() {
     if (!confirm('¿Estás seguro de que quieres eliminar todos los tokens usados?')) return;
     
     try {
-        const response = await fetch(`${API_URL}/tokens/clear-used`, {
+        const response = await authenticatedFetch(`${API_URL}/tokens/clear-used`, {
             method: 'DELETE'
         });
         
@@ -409,7 +486,7 @@ async function confirmImport() {
             tokensToImport = lines.map(line => line.trim());
         }
         
-        const response = await fetch(`${API_URL}/tokens/import`, {
+        const response = await authenticatedFetch(`${API_URL}/tokens/import`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -434,7 +511,7 @@ async function confirmImport() {
 // Cargar estadísticas
 async function loadStats() {
     try {
-        const response = await fetch(`${API_URL}/stats`);
+        const response = await authenticatedFetch(`${API_URL}/stats`);
         if (!response.ok) throw new Error('Error al cargar estadísticas');
         
         const stats = await response.json();
@@ -482,7 +559,7 @@ async function loadHistory() {
         if (search) url += `&token=${encodeURIComponent(search)}`;
         if (success) url += `&success=${success}`;
         
-        const response = await fetch(url);
+        const response = await authenticatedFetch(url);
         if (!response.ok) throw new Error('Error al cargar historial');
         
         const data = await response.json();
@@ -524,7 +601,7 @@ async function loadLogs() {
         let url = `${API_URL}/logs?limit=100`;
         if (action) url += `&action=${encodeURIComponent(action)}`;
         
-        const response = await fetch(url);
+        const response = await authenticatedFetch(url);
         if (!response.ok) throw new Error('Error al cargar logs');
         
         const logs = await response.json();

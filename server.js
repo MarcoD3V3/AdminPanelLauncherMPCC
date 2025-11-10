@@ -5,12 +5,16 @@ const fs = require('fs').promises;
 const path = require('path');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 const TOKENS_FILE = path.join(__dirname, 'tokens.json');
 const HISTORY_FILE = path.join(__dirname, 'validation_history.json');
 const LOGS_FILE = path.join(__dirname, 'activity_logs.json');
 const CONFIG_FILE = path.join(__dirname, 'config.json');
+const USERS_FILE = path.join(__dirname, 'users.json');
+const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(64).toString('hex');
 
 // Middleware de seguridad
 app.use(helmet({
@@ -159,10 +163,170 @@ function generateToken() {
     return crypto.randomBytes(32).toString('hex').toUpperCase();
 }
 
+// ==================== SISTEMA DE USUARIOS ====================
+
+// Cargar usuarios
+async function loadUsers() {
+    try {
+        const data = await fs.readFile(USERS_FILE, 'utf-8');
+        return JSON.parse(data);
+    } catch (error) {
+        // Si no existe, crear usuario por defecto
+        const defaultUsers = [{
+            username: 'admin',
+            password: await bcrypt.hash('admin123', 10), // Contraseña por defecto
+            createdAt: new Date().toISOString(),
+            role: 'admin'
+        }];
+        await saveUsers(defaultUsers);
+        console.log('⚠️ Usuario por defecto creado: admin / admin123');
+        return defaultUsers;
+    }
+}
+
+// Guardar usuarios
+async function saveUsers(users) {
+    await fs.writeFile(USERS_FILE, JSON.stringify(users, null, 2));
+}
+
+// Verificar credenciales
+async function verifyCredentials(username, password) {
+    const users = await loadUsers();
+    const user = users.find(u => u.username === username);
+    
+    if (!user) {
+        return null;
+    }
+    
+    const isValid = await bcrypt.compare(password, user.password);
+    if (!isValid) {
+        return null;
+    }
+    
+    return { username: user.username, role: user.role || 'user' };
+}
+
+// Middleware de autenticación JWT
+function authenticateToken(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+    
+    if (!token) {
+        return res.status(401).json({ error: 'Token de acceso requerido' });
+    }
+    
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) {
+            return res.status(403).json({ error: 'Token inválido o expirado' });
+        }
+        req.user = user;
+        next();
+    });
+}
+
+// Middleware opcional (para rutas que pueden funcionar con o sin auth)
+function optionalAuth(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    
+    if (token) {
+        jwt.verify(token, JWT_SECRET, (err, user) => {
+            if (!err) {
+                req.user = user;
+            }
+        });
+    }
+    next();
+}
+
+// ==================== RUTAS DE AUTENTICACIÓN ====================
+
+// Login (para panel y launcher)
+app.post('/api/auth/login', apiLimiter, async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        const ip = getClientIp(req);
+        
+        if (!username || !password) {
+            return res.status(400).json({ error: 'Usuario y contraseña requeridos' });
+        }
+        
+        const user = await verifyCredentials(username, password);
+        
+        if (!user) {
+            await addLog('LOGIN_FAILED', { username, ip }, ip);
+            return res.status(401).json({ error: 'Credenciales inválidas' });
+        }
+        
+        // Generar JWT
+        const token = jwt.sign(
+            { username: user.username, role: user.role },
+            JWT_SECRET,
+            { expiresIn: '7d' } // Token válido por 7 días
+        );
+        
+        await addLog('LOGIN_SUCCESS', { username: user.username, ip }, ip);
+        
+        res.json({
+            success: true,
+            token: token,
+            user: {
+                username: user.username,
+                role: user.role
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Verificar token
+app.get('/api/auth/verify', optionalAuth, async (req, res) => {
+    if (req.user) {
+        res.json({ valid: true, user: req.user });
+    } else {
+        res.json({ valid: false });
+    }
+});
+
+// Cambiar contraseña (requiere autenticación)
+app.post('/api/auth/change-password', authenticateToken, apiLimiter, async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+        const username = req.user.username;
+        const ip = getClientIp(req);
+        
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ error: 'Contraseña actual y nueva requeridas' });
+        }
+        
+        const users = await loadUsers();
+        const user = users.find(u => u.username === username);
+        
+        if (!user) {
+            return res.status(404).json({ error: 'Usuario no encontrado' });
+        }
+        
+        const isValid = await bcrypt.compare(currentPassword, user.password);
+        if (!isValid) {
+            return res.status(401).json({ error: 'Contraseña actual incorrecta' });
+        }
+        
+        user.password = await bcrypt.hash(newPassword, 10);
+        await saveUsers(users);
+        
+        await addLog('PASSWORD_CHANGED', { username }, ip);
+        
+        res.json({ success: true, message: 'Contraseña actualizada exitosamente' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // ==================== RUTAS ====================
 
-// Obtener todos los tokens
-app.get('/api/tokens', apiLimiter, async (req, res) => {
+// Obtener todos los tokens (requiere autenticación)
+app.get('/api/tokens', authenticateToken, apiLimiter, async (req, res) => {
     try {
         const tokens = await loadTokens();
         res.json(tokens);
@@ -171,8 +335,8 @@ app.get('/api/tokens', apiLimiter, async (req, res) => {
     }
 });
 
-// Generar nuevos tokens
-app.post('/api/tokens/generate', apiLimiter, async (req, res) => {
+// Generar nuevos tokens (requiere autenticación)
+app.post('/api/tokens/generate', authenticateToken, apiLimiter, async (req, res) => {
     try {
         const { count = 1 } = req.body;
         const ip = getClientIp(req);
@@ -218,8 +382,8 @@ app.post('/api/tokens/generate', apiLimiter, async (req, res) => {
     }
 });
 
-// Validar token (usado por el launcher)
-app.post('/api/validate-token', validateLimiter, async (req, res) => {
+// Validar token (usado por el launcher - requiere autenticación)
+app.post('/api/validate-token', authenticateToken, validateLimiter, async (req, res) => {
     try {
         const { token } = req.body;
         const ip = getClientIp(req);
@@ -261,8 +425,11 @@ app.post('/api/validate-token', validateLimiter, async (req, res) => {
         tokenRecord.usedFromIp = ip;
         await saveTokens(tokens);
         
-        // Registrar en historial
+        // Registrar en historial (con información del usuario)
         await addToHistory(token, ip, userAgent, true);
+        
+        // Agregar información del usuario que validó
+        tokenRecord.validatedBy = req.user.username;
         
         res.json({
             valid: true,
@@ -281,8 +448,8 @@ app.post('/api/validate-token', validateLimiter, async (req, res) => {
     }
 });
 
-// Eliminar un token
-app.delete('/api/tokens/:token', apiLimiter, async (req, res) => {
+// Eliminar un token (requiere autenticación)
+app.delete('/api/tokens/:token', authenticateToken, apiLimiter, async (req, res) => {
     try {
         const { token } = req.params;
         const ip = getClientIp(req);
@@ -304,8 +471,8 @@ app.delete('/api/tokens/:token', apiLimiter, async (req, res) => {
     }
 });
 
-// Limpiar tokens usados
-app.delete('/api/tokens/clear-used', apiLimiter, async (req, res) => {
+// Limpiar tokens usados (requiere autenticación)
+app.delete('/api/tokens/clear-used', authenticateToken, apiLimiter, async (req, res) => {
     try {
         const ip = getClientIp(req);
         const tokens = await loadTokens();
@@ -329,8 +496,8 @@ app.delete('/api/tokens/clear-used', apiLimiter, async (req, res) => {
 
 // ==================== NUEVOS ENDPOINTS ====================
 
-// Obtener estadísticas
-app.get('/api/stats', apiLimiter, async (req, res) => {
+// Obtener estadísticas (requiere autenticación)
+app.get('/api/stats', authenticateToken, apiLimiter, async (req, res) => {
     try {
         const tokens = await loadTokens();
         const history = await loadHistory();
@@ -389,8 +556,8 @@ app.get('/api/stats', apiLimiter, async (req, res) => {
     }
 });
 
-// Obtener historial de validaciones
-app.get('/api/history', apiLimiter, async (req, res) => {
+// Obtener historial de validaciones (requiere autenticación)
+app.get('/api/history', authenticateToken, apiLimiter, async (req, res) => {
     try {
         const { limit = 100, offset = 0, token, success } = req.query;
         let history = await loadHistory();
@@ -421,8 +588,8 @@ app.get('/api/history', apiLimiter, async (req, res) => {
     }
 });
 
-// Exportar tokens
-app.get('/api/tokens/export', apiLimiter, async (req, res) => {
+// Exportar tokens (requiere autenticación)
+app.get('/api/tokens/export', authenticateToken, apiLimiter, async (req, res) => {
     try {
         const { format = 'json' } = req.query;
         const tokens = await loadTokens();
@@ -455,8 +622,8 @@ app.get('/api/tokens/export', apiLimiter, async (req, res) => {
     }
 });
 
-// Importar tokens
-app.post('/api/tokens/import', apiLimiter, async (req, res) => {
+// Importar tokens (requiere autenticación)
+app.post('/api/tokens/import', authenticateToken, apiLimiter, async (req, res) => {
     try {
         const { tokens: tokensToImport } = req.body;
         const ip = getClientIp(req);
@@ -506,8 +673,8 @@ app.post('/api/tokens/import', apiLimiter, async (req, res) => {
     }
 });
 
-// Obtener logs de actividad
-app.get('/api/logs', apiLimiter, async (req, res) => {
+// Obtener logs de actividad (requiere autenticación)
+app.get('/api/logs', authenticateToken, apiLimiter, async (req, res) => {
     try {
         const { limit = 100, action } = req.query;
         let logs = await loadLogs();
@@ -528,8 +695,8 @@ app.get('/api/logs', apiLimiter, async (req, res) => {
     }
 });
 
-// Obtener configuración
-app.get('/api/config', apiLimiter, async (req, res) => {
+// Obtener configuración (requiere autenticación)
+app.get('/api/config', authenticateToken, apiLimiter, async (req, res) => {
     try {
         const config = await loadConfig();
         res.json(config);
@@ -538,8 +705,8 @@ app.get('/api/config', apiLimiter, async (req, res) => {
     }
 });
 
-// Actualizar configuración
-app.put('/api/config', apiLimiter, async (req, res) => {
+// Actualizar configuración (requiere autenticación)
+app.put('/api/config', authenticateToken, apiLimiter, async (req, res) => {
     try {
         const ip = getClientIp(req);
         const newConfig = req.body;

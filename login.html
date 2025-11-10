@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iniciar Sesión - Panel de Administración</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .login-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .login-box {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 400px;
+        }
+        
+        .login-box h1 {
+            text-align: center;
+            color: #667eea;
+            margin-bottom: 30px;
+        }
+        
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .login-form input {
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+        
+        .login-form input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .login-form button {
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .login-form button:hover {
+            transform: translateY(-2px);
+        }
+        
+        .login-form button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .error-message {
+            background: #fee;
+            color: #c33;
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 4px solid #c33;
+            display: none;
+        }
+        
+        .error-message.show {
+            display: block;
+        }
+        
+        .default-credentials {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f0f0f0;
+            border-radius: 8px;
+            font-size: 0.9em;
+            color: #666;
+        }
+        
+        .default-credentials strong {
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-box">
+            <h1>🔐 Iniciar Sesión</h1>
+            <form class="login-form" id="login-form" onsubmit="handleLogin(event)">
+                <div id="error-message" class="error-message"></div>
+                <input 
+                    type="text" 
+                    id="username" 
+                    placeholder="Usuario" 
+                    required 
+                    autocomplete="username"
+                >
+                <input 
+                    type="password" 
+                    id="password" 
+                    placeholder="Contraseña" 
+                    required 
+                    autocomplete="current-password"
+                >
+                <button type="submit" id="login-btn">Iniciar Sesión</button>
+            </form>
+            <div class="default-credentials">
+                <strong>Nota:</strong> Usuario por defecto: <strong>admin</strong> / <strong>admin123</strong>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const API_URL = window.location.origin + '/api';
+        
+        async function handleLogin(event) {
+            event.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const loginBtn = document.getElementById('login-btn');
+            const errorMsg = document.getElementById('error-message');
+            
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Iniciando sesión...';
+            errorMsg.classList.remove('show');
+            
+            try {
+                const response = await fetch(`${API_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Error al iniciar sesión');
+                }
+                
+                // Guardar token
+                localStorage.setItem('authToken', data.token);
+                localStorage.setItem('user', JSON.stringify(data.user));
+                
+                // Redirigir al panel
+                window.location.href = 'index.html';
+            } catch (error) {
+                errorMsg.textContent = error.message;
+                errorMsg.classList.add('show');
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Iniciar Sesión';
+            }
+        }
+        
+        // Verificar si ya está autenticado
+        window.addEventListener('DOMContentLoaded', async () => {
+            const token = localStorage.getItem('authToken');
+            if (token) {
+                try {
+                    const response = await fetch(`${API_URL}/auth/verify`, {
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+                    const data = await response.json();
+                    if (data.valid) {
+                        window.location.href = 'index.html';
+                    }
+                } catch (error) {
+                    // Token inválido, continuar con login
+                }
+            }
+        });
+    </script>
+</body>
+</html>
+
