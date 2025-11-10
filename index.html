@@ -5,191 +5,627 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panel de Administración - Tokens</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>🔐 Panel de Administración de Tokens</h1>
-            <p class="subtitle">Gestiona los tokens del launcher de Minecraft</p>
-        </header>
-
-        <div class="stats">
-            <div class="stat-card">
-                <div class="stat-number" id="total-tokens">0</div>
-                <div class="stat-label">Total Tokens</div>
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <i class="fas fa-shield-alt"></i>
+                <span>Admin Panel</span>
             </div>
-            <div class="stat-card">
-                <div class="stat-number" id="used-tokens">0</div>
-                <div class="stat-label">Tokens Usados</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="available-tokens">0</div>
-                <div class="stat-label">Tokens Disponibles</div>
-            </div>
-        </div>
-
-        <div class="actions">
-            <button class="btn btn-primary" onclick="generateToken()">
-                ➕ Generar Nuevo Token
-            </button>
-            <button class="btn btn-secondary" onclick="refreshTokens()">
-                🔄 Actualizar Lista
-            </button>
-            <button class="btn btn-success" onclick="exportTokens()">
-                📥 Exportar Tokens
-            </button>
-            <button class="btn btn-info" onclick="showImportModal()">
-                📤 Importar Tokens
-            </button>
-            <button class="btn btn-danger" onclick="clearUsedTokens()">
-                🗑️ Limpiar Tokens Usados
+            <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()">
+                <i class="fas fa-bars"></i>
             </button>
         </div>
         
-        <div class="tabs-container">
-            <div class="tabs">
-                <button class="tab-btn active" onclick="switchTab('tokens')" data-tab="tokens">
-                    🔑 Tokens
+        <nav class="sidebar-nav">
+            <a href="#" class="nav-item active" data-page="dashboard" onclick="navigateTo('dashboard')">
+                <i class="fas fa-home"></i>
+                <span>Dashboard</span>
+            </a>
+            <a href="#" class="nav-item" data-page="tokens" onclick="navigateTo('tokens')">
+                <i class="fas fa-key"></i>
+                <span>Tokens</span>
+            </a>
+            <a href="#" class="nav-item" data-page="history" onclick="navigateTo('history')">
+                <i class="fas fa-history"></i>
+                <span>Historial</span>
+            </a>
+            <a href="#" class="nav-item" data-page="analytics" onclick="navigateTo('analytics')">
+                <i class="fas fa-chart-line"></i>
+                <span>Analíticas</span>
+            </a>
+            <a href="#" class="nav-item" data-page="users" onclick="navigateTo('users')">
+                <i class="fas fa-users"></i>
+                <span>Usuarios</span>
+            </a>
+            <a href="#" class="nav-item" data-page="sessions" onclick="navigateTo('sessions')">
+                <i class="fas fa-user-clock"></i>
+                <span>Sesiones</span>
+            </a>
+            <a href="#" class="nav-item" data-page="logs" onclick="navigateTo('logs')">
+                <i class="fas fa-file-alt"></i>
+                <span>Logs</span>
+            </a>
+            <a href="#" class="nav-item" data-page="alerts" onclick="navigateTo('alerts')">
+                <i class="fas fa-bell"></i>
+                <span>Alertas</span>
+                <span class="badge" id="alerts-badge">0</span>
+            </a>
+            <a href="#" class="nav-item" data-page="settings" onclick="navigateTo('settings')">
+                <i class="fas fa-cog"></i>
+                <span>Configuración</span>
+            </a>
+            <a href="#" class="nav-item" data-page="backup" onclick="navigateTo('backup')">
+                <i class="fas fa-database"></i>
+                <span>Backup</span>
+            </a>
+            <a href="#" class="nav-item" data-page="api" onclick="navigateTo('api')">
+                <i class="fas fa-code"></i>
+                <span>API Keys</span>
+            </a>
+            <a href="#" class="nav-item" data-page="security" onclick="navigateTo('security')">
+                <i class="fas fa-shield-alt"></i>
+                <span>Seguridad</span>
+            </a>
+            <a href="#" class="nav-item" data-page="reports" onclick="navigateTo('reports')">
+                <i class="fas fa-file-pdf"></i>
+                <span>Reportes</span>
+            </a>
+        </nav>
+        
+        <div class="sidebar-footer">
+            <div class="user-info" id="user-info">
+                <div class="user-avatar">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="user-details">
+                    <div class="user-name" id="user-name">Admin</div>
+                    <div class="user-role" id="user-role">Administrador</div>
+                </div>
+            </div>
+            <button class="btn-logout" onclick="logout()">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Cerrar Sesión</span>
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content" id="main-content">
+        <!-- Top Bar -->
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="menu-toggle" onclick="toggleSidebar()">
+                    <i class="fas fa-bars"></i>
                 </button>
-                <button class="tab-btn" onclick="switchTab('history')" data-tab="history">
-                    📜 Historial
+                <h1 class="page-title" id="page-title">Dashboard</h1>
+            </div>
+            <div class="topbar-right">
+                <div class="theme-toggle" onclick="toggleTheme()">
+                    <i class="fas fa-moon" id="theme-icon"></i>
+                </div>
+                <div class="notifications-dropdown">
+                    <button class="notification-btn" onclick="toggleNotifications()">
+                        <i class="fas fa-bell"></i>
+                        <span class="notification-count" id="notification-count">0</span>
+                    </button>
+                    <div class="notifications-panel" id="notifications-panel">
+                        <div class="notifications-header">
+                            <h3>Notificaciones</h3>
+                            <button onclick="markAllAsRead()">Marcar todas como leídas</button>
+                        </div>
+                        <div class="notifications-list" id="notifications-list">
+                            <!-- Notificaciones se cargarán aquí -->
+                        </div>
+                    </div>
+                </div>
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" placeholder="Búsqueda rápida..." id="global-search">
+                </div>
+            </div>
+        </header>
+
+        <!-- Page Content -->
+        <div class="page-content">
+            <!-- Dashboard Page -->
+            <div id="page-dashboard" class="page active">
+                <div class="stats-grid">
+                    <div class="stat-card stat-primary">
+                        <div class="stat-icon">
+                            <i class="fas fa-key"></i>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="total-tokens">0</div>
+                            <div class="stat-label">Total Tokens</div>
+                            <div class="stat-change positive" id="tokens-change">
+                                <i class="fas fa-arrow-up"></i> 0%
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-card stat-success">
+                        <div class="stat-icon">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="available-tokens">0</div>
+                            <div class="stat-label">Tokens Disponibles</div>
+                            <div class="stat-change" id="available-change">
+                                <i class="fas fa-minus"></i> 0%
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-card stat-warning">
+                        <div class="stat-icon">
+                            <i class="fas fa-times-circle"></i>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="used-tokens">0</div>
+                            <div class="stat-label">Tokens Usados</div>
+                            <div class="stat-change" id="used-change">
+                                <i class="fas fa-minus"></i> 0%
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-card stat-info">
+                        <div class="stat-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="validations-today">0</div>
+                            <div class="stat-label">Validaciones Hoy</div>
+                            <div class="stat-change" id="validations-change">
+                                <i class="fas fa-minus"></i> 0%
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid">
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-chart-area"></i> Uso de Tokens (Últimos 7 días)</h3>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="tokens-chart"></canvas>
+                        </div>
+                    </div>
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-chart-pie"></i> Distribución de Tokens</h3>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="distribution-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid">
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-clock"></i> Actividad Reciente</h3>
+                            <button class="btn-sm" onclick="navigateTo('logs')">Ver todo</button>
+                        </div>
+                        <div class="card-body">
+                            <div class="activity-list" id="recent-activity">
+                                <!-- Actividad reciente -->
+                            </div>
+                        </div>
+                    </div>
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-exclamation-triangle"></i> Alertas</h3>
+                            <button class="btn-sm" onclick="navigateTo('alerts')">Ver todo</button>
+                        </div>
+                        <div class="card-body">
+                            <div class="alerts-list" id="recent-alerts">
+                                <!-- Alertas recientes -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tokens Page -->
+            <div id="page-tokens" class="page">
+                <div class="page-header">
+                    <h2>Gestión de Tokens</h2>
+                    <div class="page-actions">
+                        <button class="btn btn-primary" onclick="generateToken()">
+                            <i class="fas fa-plus"></i> Generar Token
+                        </button>
+                        <button class="btn btn-success" onclick="exportTokens()">
+                            <i class="fas fa-download"></i> Exportar
+                        </button>
+                        <button class="btn btn-info" onclick="showImportModal()">
+                            <i class="fas fa-upload"></i> Importar
+                        </button>
+                        <button class="btn btn-danger" onclick="clearUsedTokens()">
+                            <i class="fas fa-trash"></i> Limpiar Usados
+                        </button>
+                    </div>
+                </div>
+
+                <div class="filters-bar">
+                    <div class="search-box-inline">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="search-input" placeholder="Buscar token..." onkeyup="filterTokens()">
+                    </div>
+                    <select id="filter-status" onchange="filterTokens()">
+                        <option value="">Todos los estados</option>
+                        <option value="available">Disponibles</option>
+                        <option value="used">Usados</option>
+                    </select>
+                    <select id="filter-date" onchange="filterTokens()">
+                        <option value="">Todas las fechas</option>
+                        <option value="today">Hoy</option>
+                        <option value="week">Esta semana</option>
+                        <option value="month">Este mes</option>
+                    </select>
+                    <button class="btn btn-secondary" onclick="refreshTokens()">
+                        <i class="fas fa-sync-alt"></i> Actualizar
+                    </button>
+                </div>
+
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th onclick="sortTokens('token')">
+                                    Token <i class="fas fa-sort"></i>
+                                </th>
+                                <th onclick="sortTokens('status')">
+                                    Estado <i class="fas fa-sort"></i>
+                                </th>
+                                <th onclick="sortTokens('createdAt')">
+                                    Fecha Creación <i class="fas fa-sort"></i>
+                                </th>
+                                <th onclick="sortTokens('usedAt')">
+                                    Fecha Uso <i class="fas fa-sort"></i>
+                                </th>
+                                <th>IP de Uso</th>
+                                <th>Etiquetas</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tokens-tbody">
+                            <!-- Tokens se cargarán aquí -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="pagination" id="pagination"></div>
+            </div>
+
+            <!-- History Page -->
+            <div id="page-history" class="page">
+                <div class="page-header">
+                    <h2>Historial de Validaciones</h2>
+                </div>
+
+                <div class="filters-bar">
+                    <div class="search-box-inline">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="history-search" placeholder="Buscar por token o IP..." onkeyup="loadHistory()">
+                    </div>
+                    <select id="history-success-filter" onchange="loadHistory()">
+                        <option value="">Todos</option>
+                        <option value="true">Exitosos</option>
+                        <option value="false">Fallidos</option>
+                    </select>
+                    <input type="date" id="history-date-from" onchange="loadHistory()">
+                    <input type="date" id="history-date-to" onchange="loadHistory()">
+                </div>
+
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Token</th>
+                                <th>Usuario</th>
+                                <th>IP</th>
+                                <th>Estado</th>
+                                <th>Fecha/Hora</th>
+                                <th>Error</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Analytics Page -->
+            <div id="page-analytics" class="page">
+                <div class="page-header">
+                    <h2>Analíticas y Estadísticas</h2>
+                </div>
+
+                <div class="analytics-grid">
+                    <div class="analytics-card">
+                        <h3>Uso de Tokens por Día</h3>
+                        <canvas id="daily-usage-chart"></canvas>
+                    </div>
+                    <div class="analytics-card">
+                        <h3>Tasa de Éxito</h3>
+                        <canvas id="success-rate-chart"></canvas>
+                    </div>
+                    <div class="analytics-card">
+                        <h3>Top IPs</h3>
+                        <div id="top-ips-list"></div>
+                    </div>
+                    <div class="analytics-card">
+                        <h3>Actividad por Hora</h3>
+                        <canvas id="hourly-activity-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Users Page -->
+            <div id="page-users" class="page">
+                <div class="page-header">
+                    <h2>Gestión de Usuarios</h2>
+                    <button class="btn btn-primary" onclick="showCreateUserModal()">
+                        <i class="fas fa-plus"></i> Crear Usuario
+                    </button>
+                </div>
+
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Usuario</th>
+                                <th>Rol</th>
+                                <th>Fecha Creación</th>
+                                <th>Creado Por</th>
+                                <th>Último Acceso</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Sessions Page -->
+            <div id="page-sessions" class="page">
+                <div class="page-header">
+                    <h2>Sesiones Activas</h2>
+                    <button class="btn btn-danger" onclick="revokeAllSessions()">
+                        <i class="fas fa-ban"></i> Revocar Todas
+                    </button>
+                </div>
+
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Usuario</th>
+                                <th>IP</th>
+                                <th>Inicio</th>
+                                <th>Última Actividad</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sessions-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Logs Page -->
+            <div id="page-logs" class="page">
+                <div class="page-header">
+                    <h2>Logs del Sistema</h2>
+                </div>
+
+                <div class="filters-bar">
+                    <select id="logs-action-filter" onchange="loadLogs()">
+                        <option value="">Todas las acciones</option>
+                        <option value="TOKEN_GENERATED">Generación de tokens</option>
+                        <option value="TOKEN_DELETED">Eliminación de tokens</option>
+                        <option value="TOKENS_CLEARED">Limpieza de tokens</option>
+                        <option value="TOKENS_EXPORTED">Exportación</option>
+                        <option value="TOKENS_IMPORTED">Importación</option>
+                        <option value="CONFIG_UPDATED">Cambios de configuración</option>
+                        <option value="USER_CREATED">Creación de usuarios</option>
+                        <option value="USER_DELETED">Eliminación de usuarios</option>
+                        <option value="USER_PASSWORD_CHANGED">Cambio de contraseñas</option>
+                        <option value="LOGIN_SUCCESS">Inicios de sesión</option>
+                        <option value="LOGIN_FAILED">Intentos de login fallidos</option>
+                    </select>
+                    <select id="logs-level-filter" onchange="loadLogs()">
+                        <option value="">Todos los niveles</option>
+                        <option value="info">Info</option>
+                        <option value="warning">Warning</option>
+                        <option value="error">Error</option>
+                    </select>
+                </div>
+
+                <div class="logs-container" id="logs-container"></div>
+            </div>
+
+            <!-- Alerts Page -->
+            <div id="page-alerts" class="page">
+                <div class="page-header">
+                    <h2>Alertas y Notificaciones</h2>
+                    <button class="btn btn-primary" onclick="createAlert()">
+                        <i class="fas fa-plus"></i> Crear Alerta
+                    </button>
+                </div>
+
+                <div class="alerts-container" id="alerts-container"></div>
+            </div>
+
+            <!-- Settings Page -->
+            <div id="page-settings" class="page">
+                <div class="page-header">
+                    <h2>Configuración</h2>
+                </div>
+
+                <div class="settings-grid">
+                    <div class="settings-section">
+                        <h3><i class="fas fa-cog"></i> Configuración General</h3>
+                        <div class="setting-item">
+                            <label>Máximo de Tokens</label>
+                            <input type="number" id="max-tokens" value="10000">
+                        </div>
+                        <div class="setting-item">
+                            <label>Rate Limiting Habilitado</label>
+                            <label class="switch">
+                                <input type="checkbox" id="rate-limit-enabled" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <label>Notificaciones Habilitadas</label>
+                            <label class="switch">
+                                <input type="checkbox" id="notifications-enabled">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3><i class="fas fa-palette"></i> Apariencia</h3>
+                        <div class="setting-item">
+                            <label>Tema</label>
+                            <select id="theme-select" onchange="changeTheme(this.value)">
+                                <option value="auto">Automático</option>
+                                <option value="light">Claro</option>
+                                <option value="dark">Oscuro</option>
+                            </select>
+                        </div>
+                        <div class="setting-item">
+                            <label>Elementos por página</label>
+                            <input type="number" id="items-per-page" value="20" min="10" max="100">
+                        </div>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary" onclick="saveSettings()">
+                    <i class="fas fa-save"></i> Guardar Configuración
                 </button>
-                <button class="tab-btn" onclick="switchTab('stats')" data-tab="stats">
-                    📊 Estadísticas
-                </button>
-                <button class="tab-btn" onclick="switchTab('logs')" data-tab="logs">
-                    📋 Logs
-                </button>
-                <button class="tab-btn" onclick="switchTab('users')" data-tab="users">
-                    👥 Usuarios
-                </button>
+            </div>
+
+            <!-- Backup Page -->
+            <div id="page-backup" class="page">
+                <div class="page-header">
+                    <h2>Backup y Restauración</h2>
+                </div>
+
+                <div class="backup-grid">
+                    <div class="backup-card">
+                        <h3><i class="fas fa-download"></i> Crear Backup</h3>
+                        <p>Genera un backup completo de todos los datos</p>
+                        <button class="btn btn-primary" onclick="createBackup()">
+                            <i class="fas fa-database"></i> Crear Backup
+                        </button>
+                    </div>
+                    <div class="backup-card">
+                        <h3><i class="fas fa-upload"></i> Restaurar Backup</h3>
+                        <p>Restaura datos desde un archivo de backup</p>
+                        <input type="file" id="backup-file" accept=".json" style="display: none;" onchange="restoreBackup(this.files[0])">
+                        <button class="btn btn-success" onclick="document.getElementById('backup-file').click()">
+                            <i class="fas fa-file-upload"></i> Seleccionar Archivo
+                        </button>
+                    </div>
+                </div>
+
+                <div class="backup-list" id="backup-list">
+                    <h3>Backups Recientes</h3>
+                    <div id="backups-container"></div>
+                </div>
+            </div>
+
+            <!-- API Page -->
+            <div id="page-api" class="page">
+                <div class="page-header">
+                    <h2>API Keys</h2>
+                    <button class="btn btn-primary" onclick="generateApiKey()">
+                        <i class="fas fa-plus"></i> Generar API Key
+                    </button>
+                </div>
+
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Key</th>
+                                <th>Permisos</th>
+                                <th>Creado</th>
+                                <th>Último Uso</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="api-keys-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Security Page -->
+            <div id="page-security" class="page">
+                <div class="page-header">
+                    <h2>Seguridad</h2>
+                </div>
+
+                <div class="security-grid">
+                    <div class="security-card">
+                        <h3><i class="fas fa-ban"></i> IPs Bloqueadas</h3>
+                        <div class="ip-list" id="blocked-ips"></div>
+                        <button class="btn btn-primary" onclick="addBlockedIp()">
+                            <i class="fas fa-plus"></i> Agregar IP
+                        </button>
+                    </div>
+                    <div class="security-card">
+                        <h3><i class="fas fa-check-circle"></i> IPs Permitidas</h3>
+                        <div class="ip-list" id="allowed-ips"></div>
+                        <button class="btn btn-success" onclick="addAllowedIp()">
+                            <i class="fas fa-plus"></i> Agregar IP
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reports Page -->
+            <div id="page-reports" class="page">
+                <div class="page-header">
+                    <h2>Reportes</h2>
+                    <button class="btn btn-primary" onclick="generateReport()">
+                        <i class="fas fa-file-pdf"></i> Generar Reporte
+                    </button>
+                </div>
+
+                <div class="reports-grid">
+                    <div class="report-card" onclick="generateReport('daily')">
+                        <i class="fas fa-calendar-day"></i>
+                        <h3>Reporte Diario</h3>
+                        <p>Resumen de actividad del día</p>
+                    </div>
+                    <div class="report-card" onclick="generateReport('weekly')">
+                        <i class="fas fa-calendar-week"></i>
+                        <h3>Reporte Semanal</h3>
+                        <p>Resumen de actividad de la semana</p>
+                    </div>
+                    <div class="report-card" onclick="generateReport('monthly')">
+                        <i class="fas fa-calendar-alt"></i>
+                        <h3>Reporte Mensual</h3>
+                        <p>Resumen de actividad del mes</p>
+                    </div>
+                    <div class="report-card" onclick="generateReport('custom')">
+                        <i class="fas fa-calendar"></i>
+                        <h3>Reporte Personalizado</h3>
+                        <p>Genera un reporte con fechas específicas</p>
+                    </div>
+                </div>
             </div>
         </div>
+    </main>
 
-        <!-- Tab: Tokens -->
-        <div id="tab-tokens" class="tab-content active">
-            <div class="search-bar">
-                <input type="text" id="search-input" placeholder="Buscar token..." onkeyup="filterTokens()">
-                <select id="filter-status" onchange="filterTokens()">
-                    <option value="">Todos los estados</option>
-                    <option value="available">Disponibles</option>
-                    <option value="used">Usados</option>
-                </select>
-            </div>
-
-            <div class="tokens-table-container">
-                <table class="tokens-table">
-                    <thead>
-                        <tr>
-                            <th onclick="sortTokens('token')">Token ↕️</th>
-                            <th onclick="sortTokens('status')">Estado ↕️</th>
-                            <th onclick="sortTokens('createdAt')">Fecha de Creación ↕️</th>
-                            <th onclick="sortTokens('usedAt')">Fecha de Uso ↕️</th>
-                            <th>IP de Uso</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tokens-tbody">
-                        <!-- Los tokens se cargarán aquí -->
-                    </tbody>
-                </table>
-            </div>
-            
-            <div class="pagination" id="pagination">
-                <!-- Paginación se generará aquí -->
-            </div>
-        </div>
-
-        <!-- Tab: Historial -->
-        <div id="tab-history" class="tab-content">
-            <div class="history-filters">
-                <input type="text" id="history-search" placeholder="Buscar por token o IP..." onkeyup="loadHistory()">
-                <select id="history-success-filter" onchange="loadHistory()">
-                    <option value="">Todos</option>
-                    <option value="true">Exitosos</option>
-                    <option value="false">Fallidos</option>
-                </select>
-            </div>
-            <div class="history-table-container">
-                <table class="tokens-table">
-                    <thead>
-                        <tr>
-                            <th>Token</th>
-                            <th>IP</th>
-                            <th>Estado</th>
-                            <th>Fecha/Hora</th>
-                            <th>Error</th>
-                        </tr>
-                    </thead>
-                    <tbody id="history-tbody">
-                        <!-- El historial se cargará aquí -->
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- Tab: Estadísticas -->
-        <div id="tab-stats" class="tab-content">
-            <div class="stats-grid" id="stats-grid">
-                <!-- Las estadísticas se cargarán aquí -->
-            </div>
-            <div class="charts-container" id="charts-container">
-                <!-- Los gráficos se cargarán aquí -->
-            </div>
-        </div>
-
-        <!-- Tab: Logs -->
-        <div id="tab-logs" class="tab-content">
-            <div class="logs-filters">
-                <select id="logs-action-filter" onchange="loadLogs()">
-                    <option value="">Todas las acciones</option>
-                    <option value="TOKEN_GENERATED">Generación de tokens</option>
-                    <option value="TOKEN_DELETED">Eliminación de tokens</option>
-                    <option value="TOKENS_CLEARED">Limpieza de tokens</option>
-                    <option value="TOKENS_EXPORTED">Exportación</option>
-                    <option value="TOKENS_IMPORTED">Importación</option>
-                    <option value="CONFIG_UPDATED">Cambios de configuración</option>
-                    <option value="USER_CREATED">Creación de usuarios</option>
-                    <option value="USER_DELETED">Eliminación de usuarios</option>
-                    <option value="USER_PASSWORD_CHANGED">Cambio de contraseñas</option>
-                    <option value="LOGIN_SUCCESS">Inicios de sesión</option>
-                    <option value="LOGIN_FAILED">Intentos de login fallidos</option>
-                </select>
-            </div>
-            <div class="logs-container" id="logs-container">
-                <!-- Los logs se cargarán aquí -->
-            </div>
-        </div>
-
-        <!-- Tab: Usuarios -->
-        <div id="tab-users" class="tab-content">
-            <div class="actions" style="margin-bottom: 20px;">
-                <button class="btn btn-primary" onclick="showCreateUserModal()">
-                    ➕ Crear Nuevo Usuario
-                </button>
-            </div>
-            <div class="tokens-table-container">
-                <table class="tokens-table">
-                    <thead>
-                        <tr>
-                            <th>Usuario</th>
-                            <th>Rol</th>
-                            <th>Fecha de Creación</th>
-                            <th>Creado Por</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody id="users-tbody">
-                        <!-- Los usuarios se cargarán aquí -->
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <div id="notification" class="notification"></div>
-    </div>
-
-    <!-- Modal para generar token -->
+    <!-- Modals -->
     <div id="generate-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -199,12 +635,13 @@
             <div class="modal-body">
                 <label>Cantidad de tokens a generar:</label>
                 <input type="number" id="token-count" min="1" max="100" value="1">
+                <label>Etiquetas (opcional):</label>
+                <input type="text" id="token-tags" placeholder="ej: promocion, beta, vip">
                 <button class="btn btn-primary" onclick="confirmGenerate()">Generar</button>
             </div>
         </div>
     </div>
 
-    <!-- Modal para importar tokens -->
     <div id="import-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -214,7 +651,7 @@
             <div class="modal-body">
                 <label>Pega los tokens (uno por línea o JSON array):</label>
                 <textarea id="import-tokens-text" rows="10" placeholder='Ejemplo:&#10;TOKEN1&#10;TOKEN2&#10;TOKEN3&#10;&#10;O formato JSON:&#10;[{"token": "TOKEN1", "used": false}, ...]'></textarea>
-                <div id="import-preview" style="display: none; margin-top: 10px; padding: 10px; background: #f0f0f0; border-radius: 5px;">
+                <div id="import-preview" style="display: none; margin-top: 10px; padding: 10px; background: var(--bg-secondary); border-radius: 5px;">
                     <strong>Vista previa:</strong> <span id="import-count">0</span> tokens detectados
                 </div>
                 <button class="btn btn-primary" onclick="confirmImport()">Importar</button>
@@ -222,7 +659,6 @@
         </div>
     </div>
 
-    <!-- Modal para crear usuario -->
     <div id="create-user-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -231,28 +667,27 @@
             </div>
             <div class="modal-body">
                 <label>Nombre de usuario:</label>
-                <input type="text" id="new-username" class="token-input" placeholder="Usuario (mín. 3 caracteres)" autocomplete="off">
-                
-                <label style="margin-top: 15px;">Contraseña:</label>
-                <input type="password" id="new-password" class="token-input" placeholder="Contraseña (mín. 6 caracteres)" autocomplete="new-password">
-                
-                <label style="margin-top: 15px;">Rol:</label>
-                <select id="new-user-role" class="token-input">
+                <input type="text" id="new-username" placeholder="Usuario (mín. 3 caracteres)" autocomplete="off">
+                <label>Contraseña:</label>
+                <input type="password" id="new-password" placeholder="Contraseña (mín. 6 caracteres)" autocomplete="new-password">
+                <label>Rol:</label>
+                <select id="new-user-role">
                     <option value="user">Usuario</option>
                     <option value="admin">Administrador</option>
                 </select>
-                
-                <div id="create-user-error" class="token-error" style="display: none; margin-top: 10px;"></div>
-                <div id="create-user-success" class="token-success" style="display: none; margin-top: 10px;">
+                <div id="create-user-error" class="error-message" style="display: none;"></div>
+                <div id="create-user-success" class="success-message" style="display: none;">
                     ✅ Usuario creado exitosamente
                 </div>
-                
-                <button class="btn btn-primary" onclick="confirmCreateUser()" style="margin-top: 15px; width: 100%;">Crear Usuario</button>
+                <button class="btn btn-primary" onclick="confirmCreateUser()">Crear Usuario</button>
             </div>
         </div>
     </div>
 
+    <!-- Notification Toast -->
+    <div id="notification" class="notification"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
-

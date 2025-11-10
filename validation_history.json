@@ -1,0 +1,20 @@
+[
+  {
+    "token": "D1BF05F4B74CA5BA7376C73C42260A9EBE9CBD0CD5660E38A5CFCF740871180F",
+    "ip": "::1",
+    "userAgent": "Minecraft-Launcher/1.0",
+    "success": false,
+    "error": "Token ya ha sido usado",
+    "username": "123123",
+    "timestamp": "2025-11-10T05:36:24.924Z"
+  },
+  {
+    "token": "4B43661AEEC430879C639B2EF2AEFC529E13843D2094398DC591425F2570F094",
+    "ip": "::1",
+    "userAgent": "Minecraft-Launcher/1.0",
+    "success": true,
+    "error": null,
+    "username": "123123",
+    "timestamp": "2025-11-10T05:36:30.349Z"
+  }
+]

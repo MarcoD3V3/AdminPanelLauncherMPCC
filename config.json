@@ -1,0 +1,5 @@
+{
+  "maxTokens": 10000,
+  "rateLimitEnabled": true,
+  "notificationsEnabled": false
+}

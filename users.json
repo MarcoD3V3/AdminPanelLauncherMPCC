@@ -1,0 +1,15 @@
+[
+  {
+    "username": "admin",
+    "password": "$2a$10$lon3APk/LNP5xl.lXtptEeo9ePC8IwJ2lHu7YXnNBQY3KZxbIF.M6",
+    "createdAt": "2025-11-10T05:26:53.389Z",
+    "role": "admin"
+  },
+  {
+    "username": "123123",
+    "password": "$2a$10$r.rieV3UQIVLdpMgtBE2bOYak.OcXL6o4f/YctiPef4sknPkDmr1G",
+    "role": "user",
+    "createdAt": "2025-11-10T05:36:03.279Z",
+    "createdBy": "admin"
+  }
+]

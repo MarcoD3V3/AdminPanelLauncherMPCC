@@ -9,6 +9,9 @@ let itemsPerPage = 20;
 let currentSort = { field: null, direction: 'asc' };
 let currentTab = 'tokens';
 let authToken = localStorage.getItem('authToken');
+let currentPageName = 'dashboard';
+let charts = {};
+let notifications = [];
 
 // Función para hacer peticiones autenticadas
 async function authenticatedFetch(url, options = {}) {
@@ -59,22 +62,13 @@ async function checkAuth() {
             return false;
         }
         
-        // Mostrar usuario actual
+        // Mostrar usuario actual en sidebar
         const user = JSON.parse(localStorage.getItem('user') || '{}');
         if (user.username) {
-            const header = document.querySelector('header');
-            if (header) {
-                const userInfo = document.createElement('div');
-                userInfo.style.cssText = 'position: absolute; top: 20px; right: 20px; color: #666;';
-                const roleBadge = user.role === 'admin' ? '👑 Admin' : '👤 Usuario';
-                userInfo.innerHTML = `
-                    <span>${roleBadge} ${user.username}</span>
-                    ${user.role === 'admin' ? '<span style="margin-left: 10px; color: #667eea; font-size: 0.9em;">(Administrador)</span>' : ''}
-                    <button onclick="logout()" style="margin-left: 10px; padding: 5px 10px; background: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer;">Cerrar Sesión</button>
-                `;
-                header.style.position = 'relative';
-                header.appendChild(userInfo);
-            }
+            const userNameEl = document.getElementById('user-name');
+            const userRoleEl = document.getElementById('user-role');
+            if (userNameEl) userNameEl.textContent = user.username;
+            if (userRoleEl) userRoleEl.textContent = user.role === 'admin' ? 'Administrador' : 'Usuario';
         }
         
         return true;
@@ -95,10 +89,548 @@ function logout() {
 document.addEventListener('DOMContentLoaded', async () => {
     const isAuthenticated = await checkAuth();
     if (isAuthenticated) {
-        loadTokens();
-        loadStats();
+        initializeTheme();
+        initializeNavigation();
+        loadDashboard();
+        setupGlobalSearch();
+        loadNotifications();
+        setInterval(loadNotifications, 30000); // Actualizar notificaciones cada 30s
     }
 });
+
+// Inicializar tema
+function initializeTheme() {
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    updateThemeIcon(savedTheme);
+}
+
+// Toggle sidebar
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    sidebar.classList.toggle('open');
+}
+
+// Navegación
+function navigateTo(page) {
+    currentPageName = page;
+    
+    // Actualizar sidebar
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.remove('active');
+        if (item.dataset.page === page) {
+            item.classList.add('active');
+        }
+    });
+    
+    // Ocultar todas las páginas
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    
+    // Mostrar página seleccionada
+    const targetPage = document.getElementById(`page-${page}`);
+    if (targetPage) {
+        targetPage.classList.add('active');
+    }
+    
+    // Actualizar título
+    const pageTitle = document.getElementById('page-title');
+    if (pageTitle) {
+        const titles = {
+            dashboard: 'Dashboard',
+            tokens: 'Tokens',
+            history: 'Historial',
+            analytics: 'Analíticas',
+            users: 'Usuarios',
+            sessions: 'Sesiones',
+            logs: 'Logs',
+            alerts: 'Alertas',
+            settings: 'Configuración',
+            backup: 'Backup',
+            api: 'API Keys',
+            security: 'Seguridad',
+            reports: 'Reportes'
+        };
+        pageTitle.textContent = titles[page] || 'Panel';
+    }
+    
+    // Cargar datos según la página
+    switch(page) {
+        case 'dashboard':
+            loadDashboard();
+            break;
+        case 'tokens':
+        loadTokens();
+            break;
+        case 'history':
+            loadHistory();
+            break;
+        case 'analytics':
+            loadAnalytics();
+            break;
+        case 'users':
+            loadUsers();
+            break;
+        case 'sessions':
+            loadSessions();
+            break;
+        case 'logs':
+            loadLogs();
+            break;
+        case 'alerts':
+            loadAlerts();
+            break;
+        case 'settings':
+            loadSettings();
+            break;
+        case 'backup':
+            loadBackups();
+            break;
+        case 'api':
+            loadApiKeys();
+            break;
+        case 'security':
+            loadSecurity();
+            break;
+        case 'reports':
+            loadReports();
+            break;
+    }
+}
+
+function initializeNavigation() {
+    // Navegar a dashboard por defecto
+    navigateTo('dashboard');
+}
+
+// Toggle tema
+function toggleTheme() {
+    const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+    const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+    updateThemeIcon(newTheme);
+}
+
+function changeTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+    updateThemeIcon(theme);
+}
+
+function updateThemeIcon(theme) {
+    const icon = document.getElementById('theme-icon');
+    if (icon) {
+        icon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+    }
+}
+
+// Búsqueda global
+function setupGlobalSearch() {
+    const searchInput = document.getElementById('global-search');
+    if (searchInput) {
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const query = searchInput.value.trim();
+                if (query) {
+                    performGlobalSearch(query);
+                }
+            }
+        });
+    }
+}
+
+function performGlobalSearch(query) {
+    // Buscar en tokens
+    navigateTo('tokens');
+    document.getElementById('search-input').value = query;
+    filterTokens();
+}
+
+// Dashboard
+async function loadDashboard() {
+    await loadTokens();
+    await loadStats();
+    await loadRecentActivity();
+    await loadRecentAlerts();
+    updateDashboardStats();
+    renderDashboardCharts();
+}
+
+function updateDashboardStats() {
+    const total = tokens.length;
+    const used = tokens.filter(t => t.used).length;
+    const available = total - used;
+    
+    const totalEl = document.getElementById('total-tokens');
+    const usedEl = document.getElementById('used-tokens');
+    const availableEl = document.getElementById('available-tokens');
+    
+    if (totalEl) totalEl.textContent = total;
+    if (usedEl) usedEl.textContent = used;
+    if (availableEl) availableEl.textContent = available;
+    
+    // Calcular validaciones de hoy
+    loadStats().then(stats => {
+        const validationsEl = document.getElementById('validations-today');
+        if (validationsEl && stats) {
+            validationsEl.textContent = stats.validations?.today || 0;
+        }
+    });
+}
+
+function renderDashboardCharts() {
+    // Gráfico de uso de tokens (últimos 7 días)
+    const tokensCtx = document.getElementById('tokens-chart');
+    if (tokensCtx && tokens.length > 0) {
+        if (charts.tokens) charts.tokens.destroy();
+        
+        const last7Days = [];
+        for (let i = 6; i >= 0; i--) {
+            const date = new Date();
+            date.setDate(date.getDate() - i);
+            const dateStr = date.toISOString().split('T')[0];
+            const used = tokens.filter(t => t.usedAt && t.usedAt.startsWith(dateStr)).length;
+            last7Days.push({ date: dateStr, used });
+        }
+        
+        charts.tokens = new Chart(tokensCtx, {
+            type: 'line',
+            data: {
+                labels: last7Days.map(d => new Date(d.date).toLocaleDateString('es-ES', { weekday: 'short' })),
+                datasets: [{
+                    label: 'Tokens Usados',
+                    data: last7Days.map(d => d.used),
+                    borderColor: '#667eea',
+                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+    }
+    
+    // Gráfico de distribución
+    const distCtx = document.getElementById('distribution-chart');
+    if (distCtx && tokens.length > 0) {
+        if (charts.distribution) charts.distribution.destroy();
+        
+        const used = tokens.filter(t => t.used).length;
+        const available = tokens.length - used;
+        
+        charts.distribution = new Chart(distCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Disponibles', 'Usados'],
+                datasets: [{
+                    data: [available, used],
+                    backgroundColor: ['#10b981', '#ef4444']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false
+            }
+        });
+    }
+}
+
+async function loadRecentActivity() {
+    try {
+        const response = await authenticatedFetch(`${API_URL}/logs?limit=5`);
+        if (response.ok) {
+            const logs = await response.json();
+            const container = document.getElementById('recent-activity');
+            if (container) {
+                container.innerHTML = logs.map(log => `
+                    <div class="activity-item">
+                        <div class="activity-action">${log.action}</div>
+                        <div class="activity-details">${JSON.stringify(log.details)}</div>
+                        <div class="activity-time">${formatDate(log.timestamp)}</div>
+                    </div>
+                `).join('');
+            }
+        }
+    } catch (error) {
+        console.error('Error loading recent activity:', error);
+    }
+}
+
+async function loadRecentAlerts() {
+    try {
+        const response = await authenticatedFetch(`${API_URL}/alerts?limit=5`);
+        if (response.ok) {
+            const alerts = await response.json();
+            const container = document.getElementById('recent-alerts');
+            if (container) {
+                container.innerHTML = alerts.length > 0 ? alerts.map(alert => `
+                    <div class="activity-item">
+                        <div class="activity-action">${alert.title}</div>
+                        <div class="activity-details">${alert.message}</div>
+                        <div class="activity-time">${formatDate(alert.timestamp)}</div>
+                    </div>
+                `).join('') : '<p style="text-align: center; color: var(--text-secondary);">No hay alertas</p>';
+            }
+        }
+    } catch (error) {
+        // Si no existe el endpoint, no mostrar nada
+    }
+}
+
+// Notificaciones
+async function loadNotifications() {
+    try {
+        const response = await authenticatedFetch(`${API_URL}/notifications`);
+        if (response.ok) {
+            notifications = await response.json();
+            updateNotificationBadge();
+            renderNotifications();
+        }
+    } catch (error) {
+        // Endpoint puede no existir aún
+    }
+}
+
+function updateNotificationBadge() {
+    const unread = notifications.filter(n => !n.read).length;
+    const badge = document.getElementById('notification-count');
+    const alertsBadge = document.getElementById('alerts-badge');
+    if (badge) badge.textContent = unread;
+    if (alertsBadge) alertsBadge.textContent = unread;
+}
+
+function toggleNotifications() {
+    const panel = document.getElementById('notifications-panel');
+    if (panel) {
+        panel.classList.toggle('show');
+        if (panel.classList.contains('show')) {
+            renderNotifications();
+        }
+    }
+}
+
+function renderNotifications() {
+    const list = document.getElementById('notifications-list');
+    if (!list) return;
+    
+    if (notifications.length === 0) {
+        list.innerHTML = '<p style="text-align: center; padding: 20px; color: var(--text-secondary);">No hay notificaciones</p>';
+        return;
+    }
+    
+    list.innerHTML = notifications.map(notif => `
+        <div class="notification-item ${!notif.read ? 'unread' : ''}" onclick="markNotificationAsRead('${notif.id}')">
+            <div style="font-weight: 600; margin-bottom: 4px;">${notif.title}</div>
+            <div style="font-size: 0.9rem; color: var(--text-secondary);">${notif.message}</div>
+            <div style="font-size: 0.75rem; color: var(--text-tertiary); margin-top: 4px;">${formatDate(notif.timestamp)}</div>
+        </div>
+    `).join('');
+}
+
+function markNotificationAsRead(id) {
+    // Implementar cuando el endpoint esté disponible
+}
+
+function markAllAsRead() {
+    // Implementar cuando el endpoint esté disponible
+    showNotification('Todas las notificaciones marcadas como leídas', 'success');
+}
+
+// Funciones adicionales para nuevas páginas
+async function loadAnalytics() {
+    // Cargar datos de analíticas
+    await loadStats();
+    renderAnalyticsCharts();
+}
+
+function renderAnalyticsCharts() {
+    // Implementar gráficos de analíticas
+}
+
+async function loadSessions() {
+    try {
+        const response = await authenticatedFetch(`${API_URL}/sessions`);
+        if (response.ok) {
+            const sessions = await response.json();
+            renderSessions(sessions);
+        }
+    } catch (error) {
+        const tbody = document.getElementById('sessions-tbody');
+        if (tbody) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px;">No hay sesiones disponibles</td></tr>';
+        }
+    }
+}
+
+function renderSessions(sessions) {
+    const tbody = document.getElementById('sessions-tbody');
+    if (!tbody) return;
+    
+    if (sessions.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px;">No hay sesiones activas</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = sessions.map(session => `
+        <tr>
+            <td>${session.username}</td>
+            <td>${session.ip}</td>
+            <td>${formatDate(session.startedAt)}</td>
+            <td>${formatDate(session.lastActivity)}</td>
+            <td><span class="tag tag-success">Activa</span></td>
+            <td>
+                <button class="btn btn-sm btn-danger" onclick="revokeSession('${session.id}')">
+                    <i class="fas fa-ban"></i> Revocar
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+async function revokeSession(sessionId) {
+    // Implementar cuando el endpoint esté disponible
+    showNotification('Sesión revocada', 'success');
+}
+
+async function revokeAllSessions() {
+    if (!confirm('¿Estás seguro de revocar todas las sesiones?')) return;
+    // Implementar cuando el endpoint esté disponible
+    showNotification('Todas las sesiones revocadas', 'success');
+}
+
+async function loadAlerts() {
+    // Implementar carga de alertas
+}
+
+function createAlert() {
+    // Implementar creación de alertas
+    showNotification('Funcionalidad en desarrollo', 'info');
+}
+
+async function loadSettings() {
+    try {
+        const response = await authenticatedFetch(`${API_URL}/config`);
+        if (response.ok) {
+            const config = await response.json();
+            document.getElementById('max-tokens').value = config.maxTokens || 10000;
+            document.getElementById('rate-limit-enabled').checked = config.rateLimitEnabled !== false;
+            document.getElementById('notifications-enabled').checked = config.notificationsEnabled === true;
+        }
+    } catch (error) {
+        console.error('Error loading settings:', error);
+    }
+}
+
+async function saveSettings() {
+    try {
+        const config = {
+            maxTokens: parseInt(document.getElementById('max-tokens').value),
+            rateLimitEnabled: document.getElementById('rate-limit-enabled').checked,
+            notificationsEnabled: document.getElementById('notifications-enabled').checked
+        };
+        
+        const response = await authenticatedFetch(`${API_URL}/config`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config)
+        });
+        
+        if (response.ok) {
+            showNotification('Configuración guardada exitosamente', 'success');
+        }
+    } catch (error) {
+        showNotification('Error al guardar configuración: ' + error.message, 'error');
+    }
+}
+
+async function loadBackups() {
+    // Implementar carga de backups
+}
+
+async function createBackup() {
+    try {
+        const response = await authenticatedFetch(`${API_URL}/backup/create`, { method: 'POST' });
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `backup-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            showNotification('Backup creado exitosamente', 'success');
+        }
+    } catch (error) {
+        showNotification('Error al crear backup: ' + error.message, 'error');
+    }
+}
+
+async function restoreBackup(file) {
+    if (!confirm('¿Estás seguro de restaurar este backup? Esto sobrescribirá los datos actuales.')) return;
+    
+    try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        
+        const response = await authenticatedFetch(`${API_URL}/backup/restore`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            showNotification('Backup restaurado exitosamente', 'success');
+            setTimeout(() => location.reload(), 2000);
+        }
+    } catch (error) {
+        showNotification('Error al restaurar backup: ' + error.message, 'error');
+    }
+}
+
+async function loadApiKeys() {
+    // Implementar carga de API keys
+    const tbody = document.getElementById('api-keys-tbody');
+    if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px;">No hay API keys disponibles</td></tr>';
+    }
+}
+
+function generateApiKey() {
+    showNotification('Funcionalidad en desarrollo', 'info');
+}
+
+async function loadSecurity() {
+    // Implementar carga de configuración de seguridad
+}
+
+function addBlockedIp() {
+    const ip = prompt('Ingresa la IP a bloquear:');
+    if (ip) {
+        // Implementar cuando el endpoint esté disponible
+        showNotification('IP bloqueada', 'success');
+    }
+}
+
+function addAllowedIp() {
+    const ip = prompt('Ingresa la IP a permitir:');
+    if (ip) {
+        // Implementar cuando el endpoint esté disponible
+        showNotification('IP permitida', 'success');
+    }
+}
+
+async function loadReports() {
+    // Implementar carga de reportes
+}
+
+function generateReport(type) {
+    showNotification(`Generando reporte ${type}...`, 'info');
+    // Implementar generación de reportes
+}
 
 // Cargar tokens desde el servidor
 async function loadTokens() {
@@ -167,29 +699,34 @@ function renderTokens(filteredTokens = null) {
         return;
     }
     
-    tbody.innerHTML = paginatedTokens.map(token => `
+    tbody.innerHTML = paginatedTokens.map(token => {
+        const tags = token.tags || [];
+        const tagsHtml = tags.map(tag => `<span class="tag tag-primary">${tag}</span>`).join('');
+        return `
         <tr>
             <td>
-                <div class="token-code">${token.token}</div>
+                <div style="font-family: 'Courier New', monospace; font-size: 0.85rem; background: var(--bg-secondary); padding: 8px 12px; border-radius: 6px; word-break: break-all;">${token.token}</div>
             </td>
             <td>
-                <span class="status-badge ${token.used ? 'status-used' : 'status-available'}">
+                <span class="tag ${token.used ? 'tag-danger' : 'tag-success'}">
                     ${token.used ? 'Usado' : 'Disponible'}
                 </span>
             </td>
             <td>${formatDate(token.createdAt)}</td>
             <td>${token.usedAt ? formatDate(token.usedAt) : '-'}</td>
             <td>${token.usedFromIp || '-'}</td>
+            <td>${tagsHtml || '-'}</td>
             <td>
-                <button class="action-btn btn-danger" onclick="deleteToken('${token.token}')" title="Eliminar">
-                    🗑️
+                <button class="btn btn-sm btn-danger" onclick="deleteToken('${token.token}')" title="Eliminar">
+                    <i class="fas fa-trash"></i>
                 </button>
-                <button class="action-btn btn-success" onclick="copyToken('${token.token}')" title="Copiar">
-                    📋
+                <button class="btn btn-sm btn-success" onclick="copyToken('${token.token}')" title="Copiar">
+                    <i class="fas fa-copy"></i>
                 </button>
             </td>
         </tr>
-    `).join('');
+    `;
+    }).join('');
     
     renderPagination(tokensToRender.length, totalPages);
 }
@@ -214,6 +751,8 @@ function closeGenerateModal() {
 // Confirmar generación
 async function confirmGenerate() {
     const count = parseInt(document.getElementById('token-count').value) || 1;
+    const tagsInput = document.getElementById('token-tags');
+    const tags = tagsInput ? tagsInput.value.split(',').map(t => t.trim()).filter(t => t) : [];
     
     try {
         const response = await authenticatedFetch(`${API_URL}/tokens/generate`, {
@@ -221,7 +760,7 @@ async function confirmGenerate() {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ count })
+            body: JSON.stringify({ count, tags })
         });
         
         if (!response.ok) throw new Error('Error al generar tokens');
@@ -229,7 +768,9 @@ async function confirmGenerate() {
         const result = await response.json();
         showNotification(`${result.tokens.length} token(s) generado(s) exitosamente`, 'success');
         closeGenerateModal();
-        loadTokens();
+        if (currentPageName === 'tokens' || currentPageName === 'dashboard') {
+            loadTokens();
+        }
     } catch (error) {
         console.error('Error:', error);
         showNotification('Error al generar tokens: ' + error.message, 'error');
@@ -579,16 +1120,19 @@ function renderHistory(history) {
     if (!tbody) return;
     
     if (history.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px;">No hay historial disponible</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px;">No hay historial disponible</td></tr>';
         return;
     }
     
     tbody.innerHTML = history.map(entry => `
         <tr>
-            <td><div class="token-code">${entry.token || 'N/A'}</div></td>
+            <td><div style="font-family: 'Courier New', monospace; font-size: 0.85rem; background: var(--bg-secondary); padding: 8px 12px; border-radius: 6px;">${entry.token || 'N/A'}</div></td>
+            <td>
+                <strong>${entry.username || 'Unknown'}</strong>
+            </td>
             <td>${entry.ip || 'Unknown'}</td>
             <td>
-                <span class="status-badge ${entry.success ? 'status-available' : 'status-used'}">
+                <span class="tag ${entry.success ? 'tag-success' : 'tag-danger'}">
                     ${entry.success ? '✓ Exitoso' : '✗ Fallido'}
                 </span>
             </td>
@@ -621,17 +1165,81 @@ function renderLogs(logs) {
     if (!container) return;
     
     if (logs.length === 0) {
-        container.innerHTML = '<p style="text-align: center; padding: 40px;">No hay logs disponibles</p>';
+        container.innerHTML = '<p style="text-align: center; padding: 40px; color: var(--text-secondary);">No hay logs disponibles</p>';
         return;
     }
     
-    container.innerHTML = logs.map(log => `
-        <div class="log-entry">
-            <div class="log-action">${log.action}</div>
-            <div class="log-details">${JSON.stringify(log.details)}</div>
-            <div class="log-timestamp">${formatDate(log.timestamp)} | IP: ${log.ip || 'Unknown'}</div>
+    // Función para obtener icono según la acción
+    function getActionIcon(action) {
+        const icons = {
+            'LOGIN_SUCCESS': 'fa-check-circle',
+            'LOGIN_FAILED': 'fa-times-circle',
+            'TOKEN_GENERATED': 'fa-key',
+            'TOKEN_DELETED': 'fa-trash',
+            'TOKENS_CLEARED': 'fa-broom',
+            'TOKENS_EXPORTED': 'fa-download',
+            'TOKENS_IMPORTED': 'fa-upload',
+            'USER_CREATED': 'fa-user-plus',
+            'USER_DELETED': 'fa-user-minus',
+            'USER_PASSWORD_CHANGED': 'fa-lock',
+            'CONFIG_UPDATED': 'fa-cog',
+            'PASSWORD_CHANGED': 'fa-key'
+        };
+        return icons[action] || 'fa-info-circle';
+    }
+    
+    // Función para obtener color según la acción
+    function getActionColor(action) {
+        if (action.includes('SUCCESS') || action.includes('CREATED') || action.includes('GENERATED')) {
+            return 'log-success';
+        } else if (action.includes('FAILED') || action.includes('DELETED')) {
+            return 'log-error';
+        } else if (action.includes('UPDATED') || action.includes('CHANGED')) {
+            return 'log-warning';
+        }
+        return 'log-info';
+    }
+    
+    // Función para formatear JSON de forma legible
+    function formatJSON(obj) {
+        try {
+            const parsed = typeof obj === 'string' ? JSON.parse(obj) : obj;
+            return JSON.stringify(parsed, null, 2);
+        } catch (e) {
+            return typeof obj === 'string' ? obj : JSON.stringify(obj);
+        }
+    }
+    
+    container.innerHTML = logs.map((log, index) => {
+        const icon = getActionIcon(log.action);
+        const colorClass = getActionColor(log.action);
+        const details = formatJSON(log.details);
+        
+        return `
+        <div class="log-entry-card ${colorClass}">
+            <div class="log-entry-header">
+                <div class="log-icon">
+                    <i class="fas ${icon}"></i>
+                </div>
+                <div class="log-action-info">
+                    <div class="log-action-name">${log.action}</div>
+                    <div class="log-meta">
+                        <span class="log-time">
+                            <i class="fas fa-clock"></i> ${formatDate(log.timestamp)}
+                        </span>
+                        <span class="log-ip">
+                            <i class="fas fa-network-wired"></i> ${log.ip || 'Unknown'}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div class="log-entry-body">
+                <div class="log-details-label">Detalles:</div>
+                <pre class="log-details-json">${details}</pre>
+            </div>
         </div>
-    `).join('');
+    `;
+    }).join('');
 }
 
 // ==================== GESTIÓN DE USUARIOS ====================
@@ -675,7 +1283,7 @@ function renderUsers(users) {
                     ${isCurrentUser ? ' <span style="color: #667eea;">(Tú)</span>' : ''}
                 </td>
                 <td>
-                    <span class="status-badge ${isAdmin ? 'status-available' : 'status-used'}">
+                    <span class="tag ${isAdmin ? 'tag-primary' : 'tag'}">
                         ${isAdmin ? '👑 Admin' : '👤 Usuario'}
                     </span>
                 </td>
@@ -683,13 +1291,13 @@ function renderUsers(users) {
                 <td>${user.createdBy || '-'}</td>
                 <td>
                     ${!isCurrentUser ? `
-                        <button class="action-btn btn-info" onclick="changeUserPassword('${user.username}')" title="Cambiar contraseña">
-                            🔑
+                        <button class="btn btn-sm btn-info" onclick="changeUserPassword('${user.username}')" title="Cambiar contraseña">
+                            <i class="fas fa-key"></i>
                         </button>
-                        <button class="action-btn btn-danger" onclick="deleteUser('${user.username}')" title="Eliminar">
-                            🗑️
+                        <button class="btn btn-sm btn-danger" onclick="deleteUser('${user.username}')" title="Eliminar">
+                            <i class="fas fa-trash"></i>
                         </button>
-                    ` : '<span style="color: #999;">-</span>'}
+                    ` : '<span style="color: var(--text-tertiary);">-</span>'}
                 </td>
             </tr>
         `;

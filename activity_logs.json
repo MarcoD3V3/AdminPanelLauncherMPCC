@@ -1,0 +1,120 @@
+[
+  {
+    "action": "LOGIN_SUCCESS",
+    "details": {
+      "username": "admin",
+      "ip": "::1"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T05:26:53.565Z"
+  },
+  {
+    "action": "LOGIN_SUCCESS",
+    "details": {
+      "username": "admin",
+      "ip": "::1"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T05:26:57.788Z"
+  },
+  {
+    "action": "LOGIN_SUCCESS",
+    "details": {
+      "username": "admin",
+      "ip": "::1"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T05:27:09.869Z"
+  },
+  {
+    "action": "LOGIN_SUCCESS",
+    "details": {
+      "username": "admin",
+      "ip": "::1"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T05:27:12.733Z"
+  },
+  {
+    "action": "LOGIN_SUCCESS",
+    "details": {
+      "username": "admin",
+      "ip": "::1"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T05:27:23.842Z"
+  },
+  {
+    "action": "LOGIN_SUCCESS",
+    "details": {
+      "username": "admin",
+      "ip": "::1"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T05:27:26.556Z"
+  },
+  {
+    "action": "LOGIN_SUCCESS",
+    "details": {
+      "username": "admin",
+      "ip": "::1"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T05:28:39.473Z"
+  },
+  {
+    "action": "LOGIN_SUCCESS",
+    "details": {
+      "username": "admin",
+      "ip": "::1"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T05:28:43.732Z"
+  },
+  {
+    "action": "LOGIN_SUCCESS",
+    "details": {
+      "username": "admin",
+      "ip": "::1"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T05:28:46.561Z"
+  },
+  {
+    "action": "LOGIN_SUCCESS",
+    "details": {
+      "username": "admin",
+      "ip": "::1"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T05:30:37.133Z"
+  },
+  {
+    "action": "LOGIN_FAILED",
+    "details": {
+      "username": "materdoom",
+      "ip": "::1"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T05:35:31.726Z"
+  },
+  {
+    "action": "USER_CREATED",
+    "details": {
+      "username": "123123",
+      "role": "user",
+      "createdBy": "admin"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T05:36:03.285Z"
+  },
+  {
+    "action": "LOGIN_SUCCESS",
+    "details": {
+      "username": "123123",
+      "ip": "::1"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T05:36:14.687Z"
+  }
+]

@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const crypto = require('crypto');
 const fs = require('fs').promises;
+const fsSync = require('fs'); // Para operaciones síncronas (necesario para JWT_SECRET)
 const path = require('path');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
@@ -14,7 +15,35 @@ const HISTORY_FILE = path.join(__dirname, 'validation_history.json');
 const LOGS_FILE = path.join(__dirname, 'activity_logs.json');
 const CONFIG_FILE = path.join(__dirname, 'config.json');
 const USERS_FILE = path.join(__dirname, 'users.json');
-const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(64).toString('hex');
+const JWT_SECRET_FILE = path.join(__dirname, '.jwt_secret');
+
+// Cargar o generar JWT_SECRET de forma persistente
+function loadOrCreateJWTSecret() {
+    try {
+        // Intentar cargar desde archivo
+        if (fsSync.existsSync(JWT_SECRET_FILE)) {
+            const secret = fsSync.readFileSync(JWT_SECRET_FILE, 'utf-8').trim();
+            if (secret && secret.length > 0) {
+                return secret;
+            }
+        }
+        
+        // Si no existe o está vacío, generar uno nuevo
+        const secret = process.env.JWT_SECRET || crypto.randomBytes(64).toString('hex');
+        
+        // Guardar en archivo para persistencia
+        fsSync.writeFileSync(JWT_SECRET_FILE, secret, 'utf-8');
+        console.log('✅ JWT Secret generado y guardado');
+        
+        return secret;
+    } catch (error) {
+        console.error('Error al cargar/crear JWT_SECRET:', error);
+        // Fallback a variable de entorno o generar uno nuevo
+        return process.env.JWT_SECRET || crypto.randomBytes(64).toString('hex');
+    }
+}
+
+const JWT_SECRET = loadOrCreateJWTSecret();
 
 // Middleware de seguridad
 app.use(helmet({
@@ -71,7 +100,7 @@ async function saveHistory(history) {
 }
 
 // Agregar entrada al historial
-async function addToHistory(token, ip, userAgent, success, error = null) {
+async function addToHistory(token, ip, userAgent, success, error = null, username = null) {
     try {
         const history = await loadHistory();
         history.push({
@@ -80,6 +109,7 @@ async function addToHistory(token, ip, userAgent, success, error = null) {
             userAgent: userAgent || 'Unknown',
             success: success,
             error: error,
+            username: username || 'Unknown',
             timestamp: new Date().toISOString()
         });
         // Mantener solo los últimos 1000 registros
@@ -548,8 +578,11 @@ app.post('/api/validate-token', authenticateToken, validateLimiter, async (req, 
         const ip = getClientIp(req);
         const userAgent = req.headers['user-agent'] || 'Unknown';
         
+        // Obtener usuario del token JWT
+        const username = req.user ? req.user.username : 'Unknown';
+        
         if (!token) {
-            await addToHistory(token, ip, userAgent, false, 'Token no proporcionado');
+            await addToHistory(token, ip, userAgent, false, 'Token no proporcionado', username);
             return res.status(400).json({
                 valid: false,
                 success: false,
@@ -561,7 +594,7 @@ app.post('/api/validate-token', authenticateToken, validateLimiter, async (req, 
         const tokenRecord = tokens.find(t => t.token === token);
         
         if (!tokenRecord) {
-            await addToHistory(token, ip, userAgent, false, 'Token no encontrado');
+            await addToHistory(token, ip, userAgent, false, 'Token no encontrado', username);
             return res.status(400).json({
                 valid: false,
                 success: false,
@@ -570,7 +603,7 @@ app.post('/api/validate-token', authenticateToken, validateLimiter, async (req, 
         }
         
         if (tokenRecord.used) {
-            await addToHistory(token, ip, userAgent, false, 'Token ya ha sido usado');
+            await addToHistory(token, ip, userAgent, false, 'Token ya ha sido usado', username);
             return res.status(400).json({
                 valid: false,
                 success: false,
@@ -582,13 +615,11 @@ app.post('/api/validate-token', authenticateToken, validateLimiter, async (req, 
         tokenRecord.used = true;
         tokenRecord.usedAt = new Date().toISOString();
         tokenRecord.usedFromIp = ip;
+        tokenRecord.validatedBy = username;
         await saveTokens(tokens);
         
         // Registrar en historial (con información del usuario)
-        await addToHistory(token, ip, userAgent, true);
-        
-        // Agregar información del usuario que validó
-        tokenRecord.validatedBy = req.user.username;
+        await addToHistory(token, ip, userAgent, true, null, username);
         
         res.json({
             valid: true,
@@ -598,7 +629,8 @@ app.post('/api/validate-token', authenticateToken, validateLimiter, async (req, 
     } catch (error) {
         const ip = getClientIp(req);
         const userAgent = req.headers['user-agent'] || 'Unknown';
-        await addToHistory(req.body.token, ip, userAgent, false, error.message);
+        const username = req.user ? req.user.username : 'Unknown';
+        await addToHistory(req.body.token || 'N/A', ip, userAgent, false, error.message, username);
         res.status(500).json({
             valid: false,
             success: false,
