@@ -694,6 +694,12 @@ app.post('/api/validate-token', authenticateToken, validateLimiter, async (req, 
         // Obtener usuario del token JWT
         const username = req.user ? req.user.username : 'Unknown';
         
+        // Detectar si es una petición del launcher
+        // El launcher usa User-Agent 'Minecraft-Launcher/1.0' o puede venir sin Mozilla
+        const isLauncher = userAgent.includes('Minecraft-Launcher') || 
+                          userAgent.includes('Electron') || 
+                          (!userAgent.includes('Mozilla') && userAgent !== 'Unknown' && userAgent.length < 50);
+        
         if (!token) {
             await addToHistory(token, ip, userAgent, false, 'Token no proporcionado', username);
             return res.status(400).json({
@@ -733,6 +739,14 @@ app.post('/api/validate-token', authenticateToken, validateLimiter, async (req, 
         
         // Registrar en historial (con información del usuario)
         await addToHistory(token, ip, userAgent, true, null, username);
+        
+        // Si es una petición del launcher, crear o actualizar sesión del launcher
+        // Usar el token JWT como identificador único de sesión
+        if (isLauncher && username !== 'Unknown' && req.token) {
+            const launcherUserAgent = `Launcher - ${userAgent}`;
+            // Usar el token JWT como identificador de sesión del launcher
+            await createOrUpdateSession(username, ip, req.token, launcherUserAgent);
+        }
         
         res.json({
             valid: true,

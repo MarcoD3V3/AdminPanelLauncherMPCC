@@ -476,12 +476,44 @@ function renderSessions(sessions) {
         return;
     }
     
-    tbody.innerHTML = sessions.map(session => `
+    tbody.innerHTML = sessions.map(session => {
+        // Detectar si es sesión del launcher o del panel
+        const isLauncher = session.userAgent && (
+            session.userAgent.includes('Launcher') || 
+            session.userAgent.includes('Minecraft-Launcher') ||
+            session.userAgent.includes('Electron')
+        );
+        const sessionType = isLauncher ? 'Launcher' : 'Panel Web';
+        const sessionIcon = isLauncher ? '🎮' : '🌐';
+        
+        // Calcular tiempo desde última actividad
+        const lastActivity = new Date(session.lastActivity);
+        const now = new Date();
+        const minutesAgo = Math.floor((now - lastActivity) / (1000 * 60));
+        const timeAgo = minutesAgo < 1 ? 'Ahora' : 
+                        minutesAgo < 60 ? `${minutesAgo} min` :
+                        Math.floor(minutesAgo / 60) < 24 ? `${Math.floor(minutesAgo / 60)} h` :
+                        `${Math.floor(minutesAgo / 1440)} días`;
+        
+        return `
         <tr>
-            <td>${session.username}</td>
-            <td>${session.ip}</td>
+            <td>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span>${sessionIcon}</span>
+                    <strong>${session.username}</strong>
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">
+                    ${sessionType}
+                </div>
+            </td>
+            <td>${session.ip || 'Unknown'}</td>
             <td>${formatDate(session.startedAt)}</td>
-            <td>${formatDate(session.lastActivity)}</td>
+            <td>
+                ${formatDate(session.lastActivity)}
+                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">
+                    Hace ${timeAgo}
+                </div>
+            </td>
             <td><span class="tag tag-success">Activa</span></td>
             <td>
                 <button class="btn btn-sm btn-danger" onclick="revokeSession('${session.id}')">
@@ -489,7 +521,8 @@ function renderSessions(sessions) {
                 </button>
             </td>
         </tr>
-    `).join('');
+    `;
+    }).join('');
 }
 
 async function revokeSession(sessionId) {
