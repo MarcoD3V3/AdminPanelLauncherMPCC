@@ -1490,7 +1490,18 @@ function renderLogs(logs) {
 async function loadUsers() {
     try {
         const response = await authenticatedFetch(`${API_URL}/users`);
-        if (!response.ok) throw new Error('Error al cargar usuarios');
+        
+        if (!response.ok) {
+            // Intentar leer el mensaje de error del servidor
+            let errorMessage = 'Error al cargar usuarios';
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.error || errorMessage;
+            } catch (e) {
+                // Si no se puede parsear el error, usar el mensaje por defecto
+            }
+            throw new Error(errorMessage);
+        }
         
         const users = await response.json();
         renderUsers(users);
@@ -1508,7 +1519,7 @@ function renderUsers(users) {
     if (!tbody) return;
     
     if (users.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px;">No hay usuarios disponibles</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px;">No hay usuarios disponibles</td></tr>';
         return;
     }
     
@@ -1531,6 +1542,7 @@ function renderUsers(users) {
                 </td>
                 <td>${formatDate(user.createdAt)}</td>
                 <td>${user.createdBy || '-'}</td>
+                <td>${user.lastAccess ? formatDate(user.lastAccess) : '-'}</td>
                 <td>
                     ${!isCurrentUser ? `
                         <button class="btn btn-sm btn-info" onclick="changeUserPassword('${user.username}')" title="Cambiar contraseña">
