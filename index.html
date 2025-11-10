@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Administración - Tokens</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔐 Panel de Administración de Tokens</h1>
+            <p class="subtitle">Gestiona los tokens del launcher de Minecraft</p>
+        </header>
+
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="total-tokens">0</div>
+                <div class="stat-label">Total Tokens</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="used-tokens">0</div>
+                <div class="stat-label">Tokens Usados</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="available-tokens">0</div>
+                <div class="stat-label">Tokens Disponibles</div>
+            </div>
+        </div>
+
+        <div class="actions">
+            <button class="btn btn-primary" onclick="generateToken()">
+                ➕ Generar Nuevo Token
+            </button>
+            <button class="btn btn-secondary" onclick="refreshTokens()">
+                🔄 Actualizar Lista
+            </button>
+            <button class="btn btn-danger" onclick="clearUsedTokens()">
+                🗑️ Limpiar Tokens Usados
+            </button>
+        </div>
+
+        <div class="search-bar">
+            <input type="text" id="search-input" placeholder="Buscar token..." onkeyup="filterTokens()">
+        </div>
+
+        <div class="tokens-table-container">
+            <table class="tokens-table">
+                <thead>
+                    <tr>
+                        <th>Token</th>
+                        <th>Estado</th>
+                        <th>Fecha de Creación</th>
+                        <th>Fecha de Uso</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="tokens-tbody">
+                    <!-- Los tokens se cargarán aquí -->
+                </tbody>
+            </table>
+        </div>
+
+        <div id="notification" class="notification"></div>
+    </div>
+
+    <!-- Modal para generar token -->
+    <div id="generate-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Generar Nuevo Token</h2>
+                <button class="close-btn" onclick="closeGenerateModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <label>Cantidad de tokens a generar:</label>
+                <input type="number" id="token-count" min="1" max="100" value="1">
+                <button class="btn btn-primary" onclick="confirmGenerate()">Generar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
+
