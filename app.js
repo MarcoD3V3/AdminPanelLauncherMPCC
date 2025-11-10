@@ -475,10 +475,29 @@ async function loadSessions() {
 
 // Renderizar vista de usuarios basada en sesiones
 function renderUsersFromSessions(sessions) {
-    // Agrupar sesiones por usuario
+    // Filtrar solo sesiones del launcher (no del panel web)
+    const launcherSessions = sessions.filter(session => {
+        const isLauncher = session.userAgent && (
+            session.userAgent.includes('Launcher') || 
+            session.userAgent.includes('Minecraft-Launcher') ||
+            session.userAgent.includes('Electron')
+        );
+        return isLauncher;
+    });
+    
+    // Si no hay sesiones del launcher, no mostrar nada
+    if (launcherSessions.length === 0) {
+        const usersContainer = document.getElementById('users-sessions-container');
+        if (usersContainer) {
+            usersContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-secondary);">No hay usuarios del launcher activos</div>';
+        }
+        return;
+    }
+    
+    // Agrupar sesiones del launcher por usuario
     const usersMap = {};
     
-    sessions.forEach(session => {
+    launcherSessions.forEach(session => {
         if (!usersMap[session.username]) {
             usersMap[session.username] = {
                 username: session.username,
@@ -487,23 +506,15 @@ function renderUsersFromSessions(sessions) {
                 lastActivity: null,
                 totalSessions: 0,
                 launcherSessions: 0,
-                webSessions: 0
+                ips: new Set()
             };
         }
         
-        const isLauncher = session.userAgent && (
-            session.userAgent.includes('Launcher') || 
-            session.userAgent.includes('Minecraft-Launcher') ||
-            session.userAgent.includes('Electron')
-        );
-        
         usersMap[session.username].sessions.push(session);
         usersMap[session.username].totalSessions++;
-        
-        if (isLauncher) {
-            usersMap[session.username].launcherSessions++;
-        } else {
-            usersMap[session.username].webSessions++;
+        usersMap[session.username].launcherSessions++;
+        if (session.ip) {
+            usersMap[session.username].ips.add(session.ip);
         }
         
         // Determinar si el usuario está online (si alguna sesión está online)
@@ -553,7 +564,7 @@ function renderUsersFromSessions(sessions) {
     usersContainer.innerHTML = `
         <div class="dashboard-card" style="margin-bottom: 20px;">
             <div class="card-header">
-                <h3><i class="fas fa-users"></i> Usuarios Activos</h3>
+                <h3><i class="fas fa-users"></i> Usuarios del Launcher</h3>
             </div>
             <div class="card-body">
                 <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px;">
@@ -576,11 +587,14 @@ function renderUsersFromSessions(sessions) {
                                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
                                     <div style="display: flex; align-items: center; gap: 10px;">
                                         <div style="width: 40px; height: 40px; border-radius: 50%; background: ${user.isOnline ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
-                                            👤
+                                            🎮
                                         </div>
                                         <div>
                                             <div style="font-weight: 700; font-size: 1.1rem; color: var(--text-primary);">${user.username}</div>
-                                            <div style="font-size: 0.85rem; color: var(--text-secondary);">${user.totalSessions} sesión${user.totalSessions !== 1 ? 'es' : ''}</div>
+                                            <div style="font-size: 0.85rem; color: var(--text-secondary);">
+                                                ${user.totalSessions} sesión${user.totalSessions !== 1 ? 'es' : ''}
+                                                ${user.adminUsername && user.adminUsername !== user.username ? ` • Admin: ${user.adminUsername}` : ''}
+                                            </div>
                                         </div>
                                     </div>
                                     <span class="tag ${statusClass}">
@@ -590,12 +604,12 @@ function renderUsersFromSessions(sessions) {
                                 
                                 <div style="display: flex; gap: 15px; margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color);">
                                     <div style="flex: 1;">
-                                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px;">Launcher</div>
+                                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px;">Sesiones Activas</div>
                                         <div style="font-weight: 600; color: var(--text-primary);">🎮 ${user.launcherSessions}</div>
                                     </div>
                                     <div style="flex: 1;">
-                                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px;">Panel Web</div>
-                                        <div style="font-weight: 600; color: var(--text-primary);">🌐 ${user.webSessions}</div>
+                                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px;">IPs Diferentes</div>
+                                        <div style="font-weight: 600; color: var(--text-primary);">🌐 ${user.ips.size}</div>
                                     </div>
                                 </div>
                                 

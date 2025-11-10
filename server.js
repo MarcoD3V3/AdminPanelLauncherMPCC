@@ -202,7 +202,7 @@ async function saveSessions(sessions) {
 }
 
 // Crear o actualizar sesión
-async function createOrUpdateSession(username, ip, token, userAgent = 'Unknown') {
+async function createOrUpdateSession(username, ip, token, userAgent = 'Unknown', adminUsername = null) {
     try {
         const sessions = await loadSessions();
         const now = new Date().toISOString();
@@ -219,11 +219,15 @@ async function createOrUpdateSession(username, ip, token, userAgent = 'Unknown')
             if (userAgent !== 'Unknown') {
                 sessions[existingIndex].userAgent = userAgent;
             }
+            if (adminUsername) {
+                sessions[existingIndex].adminUsername = adminUsername;
+            }
         } else {
             // Crear nueva sesión
             sessions.push({
                 id: crypto.randomBytes(16).toString('hex'),
-                username: username,
+                username: username, // Username del launcher
+                adminUsername: adminUsername, // Username del admin panel (si aplica)
                 token: token,
                 ip: ip,
                 startedAt: now,
@@ -699,12 +703,16 @@ app.post('/api/tokens/generate', authenticateToken, apiLimiter, async (req, res)
 // Validar token (usado por el launcher - requiere autenticación)
 app.post('/api/validate-token', authenticateToken, validateLimiter, async (req, res) => {
     try {
-        const { token } = req.body;
+        const { token, launcherUsername } = req.body;
         const ip = getClientIp(req);
         const userAgent = req.headers['user-agent'] || 'Unknown';
         
-        // Obtener usuario del token JWT
-        const username = req.user ? req.user.username : 'Unknown';
+        // Obtener usuario del token JWT (usuario del admin panel)
+        const adminUsername = req.user ? req.user.username : 'Unknown';
+        
+        // Para sesiones del launcher, usar el launcherUsername si está disponible
+        // Si no, usar el adminUsername como fallback
+        const displayUsername = launcherUsername || adminUsername;
         
         // Detectar si es una petición del launcher
         // El launcher usa User-Agent 'Minecraft-Launcher/1.0' o puede venir sin Mozilla
@@ -713,7 +721,7 @@ app.post('/api/validate-token', authenticateToken, validateLimiter, async (req, 
                           (!userAgent.includes('Mozilla') && userAgent !== 'Unknown' && userAgent.length < 50);
         
         if (!token) {
-            await addToHistory(token, ip, userAgent, false, 'Token no proporcionado', username);
+            await addToHistory(token, ip, userAgent, false, 'Token no proporcionado', displayUsername);
             return res.status(400).json({
                 valid: false,
                 success: false,
@@ -725,7 +733,7 @@ app.post('/api/validate-token', authenticateToken, validateLimiter, async (req, 
         const tokenRecord = tokens.find(t => t.token === token);
         
         if (!tokenRecord) {
-            await addToHistory(token, ip, userAgent, false, 'Token no encontrado', username);
+            await addToHistory(token, ip, userAgent, false, 'Token no encontrado', displayUsername);
             return res.status(400).json({
                 valid: false,
                 success: false,
@@ -734,7 +742,7 @@ app.post('/api/validate-token', authenticateToken, validateLimiter, async (req, 
         }
         
         if (tokenRecord.used) {
-            await addToHistory(token, ip, userAgent, false, 'Token ya ha sido usado', username);
+            await addToHistory(token, ip, userAgent, false, 'Token ya ha sido usado', displayUsername);
             return res.status(400).json({
                 valid: false,
                 success: false,
@@ -746,18 +754,18 @@ app.post('/api/validate-token', authenticateToken, validateLimiter, async (req, 
         tokenRecord.used = true;
         tokenRecord.usedAt = new Date().toISOString();
         tokenRecord.usedFromIp = ip;
-        tokenRecord.validatedBy = username;
+        tokenRecord.validatedBy = displayUsername;
         await saveTokens(tokens);
         
         // Registrar en historial (con información del usuario)
-        await addToHistory(token, ip, userAgent, true, null, username);
+        await addToHistory(token, ip, userAgent, true, null, displayUsername);
         
         // Si es una petición del launcher, crear o actualizar sesión del launcher
-        // Usar el token JWT como identificador único de sesión
-        if (isLauncher && username !== 'Unknown' && req.token) {
+        // Usar el username del launcher (no del admin panel) y el token JWT como identificador
+        if (isLauncher && displayUsername !== 'Unknown' && req.token) {
             const launcherUserAgent = `Launcher - ${userAgent}`;
-            // Usar el token JWT como identificador de sesión del launcher
-            await createOrUpdateSession(username, ip, req.token, launcherUserAgent);
+            // Guardar tanto el username del launcher como el del admin panel
+            await createOrUpdateSession(displayUsername, ip, req.token, launcherUserAgent, adminUsername);
         }
         
         res.json({
@@ -768,8 +776,10 @@ app.post('/api/validate-token', authenticateToken, validateLimiter, async (req, 
     } catch (error) {
         const ip = getClientIp(req);
         const userAgent = req.headers['user-agent'] || 'Unknown';
-        const username = req.user ? req.user.username : 'Unknown';
-        await addToHistory(req.body.token || 'N/A', ip, userAgent, false, error.message, username);
+        const { launcherUsername } = req.body;
+        const adminUsername = req.user ? req.user.username : 'Unknown';
+        const displayUsername = launcherUsername || adminUsername;
+        await addToHistory(req.body.token || 'N/A', ip, userAgent, false, error.message, displayUsername);
         res.status(500).json({
             valid: false,
             success: false,
