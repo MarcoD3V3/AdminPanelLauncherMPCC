@@ -1080,6 +1080,36 @@ app.get('/api/sessions', authenticateToken, apiLimiter, async (req, res) => {
     }
 });
 
+// Cerrar sesión (elimina la sesión del usuario actual)
+app.post('/api/logout', authenticateToken, apiLimiter, async (req, res) => {
+    try {
+        const sessions = await loadSessions();
+        const token = req.token; // Token JWT del usuario
+        const username = req.user.username; // Username del admin panel
+        
+        // Eliminar todas las sesiones que coincidan con:
+        // 1. El token JWT actual (sesiones del admin panel o del launcher con este token)
+        // 2. El username del admin panel como adminUsername (sesiones del launcher autenticadas con este usuario)
+        // 3. El username del admin panel como username (sesiones del admin panel)
+        const filtered = sessions.filter(s => {
+            // Mantener solo sesiones que NO coincidan con ninguna de estas condiciones
+            return s.token !== token && 
+                   s.adminUsername !== username && 
+                   s.username !== username;
+        });
+        
+        const removedCount = sessions.length - filtered.length;
+        await saveSessions(filtered);
+        
+        const ip = getClientIp(req);
+        await addLog('LOGOUT', { username: username, ip, sessionsRemoved: removedCount }, ip);
+        
+        res.json({ success: true, message: 'Sesión cerrada exitosamente', sessionsRemoved: removedCount });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Revocar una sesión específica (requiere autenticación y rol admin)
 app.delete('/api/sessions/:sessionId', authenticateToken, apiLimiter, async (req, res) => {
     try {
