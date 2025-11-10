@@ -458,6 +458,7 @@ async function loadSessions() {
         if (response.ok) {
             const sessions = await response.json();
             renderSessions(sessions);
+            renderUsersFromSessions(sessions); // Renderizar vista de usuarios
             
             // Auto-refrescar cada 30 segundos para actualizar estados online/offline
             if (currentPageName === 'sessions') {
@@ -470,6 +471,146 @@ async function loadSessions() {
             tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px;">No hay sesiones disponibles</td></tr>';
         }
     }
+}
+
+// Renderizar vista de usuarios basada en sesiones
+function renderUsersFromSessions(sessions) {
+    // Agrupar sesiones por usuario
+    const usersMap = {};
+    
+    sessions.forEach(session => {
+        if (!usersMap[session.username]) {
+            usersMap[session.username] = {
+                username: session.username,
+                sessions: [],
+                isOnline: false,
+                lastActivity: null,
+                totalSessions: 0,
+                launcherSessions: 0,
+                webSessions: 0
+            };
+        }
+        
+        const isLauncher = session.userAgent && (
+            session.userAgent.includes('Launcher') || 
+            session.userAgent.includes('Minecraft-Launcher') ||
+            session.userAgent.includes('Electron')
+        );
+        
+        usersMap[session.username].sessions.push(session);
+        usersMap[session.username].totalSessions++;
+        
+        if (isLauncher) {
+            usersMap[session.username].launcherSessions++;
+        } else {
+            usersMap[session.username].webSessions++;
+        }
+        
+        // Determinar si el usuario está online (si alguna sesión está online)
+        if (session.isOnline) {
+            usersMap[session.username].isOnline = true;
+        }
+        
+        // Obtener la última actividad más reciente
+        const sessionLastActivity = new Date(session.lastActivity);
+        if (!usersMap[session.username].lastActivity || sessionLastActivity > new Date(usersMap[session.username].lastActivity)) {
+            usersMap[session.username].lastActivity = session.lastActivity;
+        }
+    });
+    
+    // Convertir a array y ordenar por última actividad
+    const users = Object.values(usersMap).sort((a, b) => {
+        return new Date(b.lastActivity) - new Date(a.lastActivity);
+    });
+    
+    // Buscar contenedor para usuarios o crear uno
+    let usersContainer = document.getElementById('users-sessions-container');
+    if (!usersContainer) {
+        // Crear contenedor si no existe
+        const sessionsPage = document.getElementById('page-sessions');
+        if (sessionsPage) {
+            const header = sessionsPage.querySelector('.page-header');
+            if (header) {
+                const container = document.createElement('div');
+                container.id = 'users-sessions-container';
+                container.style.cssText = 'margin-bottom: 30px;';
+                header.insertAdjacentElement('afterend', container);
+                usersContainer = container;
+            }
+        }
+    }
+    
+    if (!usersContainer) return;
+    
+    if (users.length === 0) {
+        usersContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-secondary);">No hay usuarios activos</div>';
+        return;
+    }
+    
+    // Calcular tiempo desde última actividad
+    const now = new Date();
+    
+    usersContainer.innerHTML = `
+        <div class="dashboard-card" style="margin-bottom: 20px;">
+            <div class="card-header">
+                <h3><i class="fas fa-users"></i> Usuarios Activos</h3>
+            </div>
+            <div class="card-body">
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px;">
+                    ${users.map(user => {
+                        const lastActivity = new Date(user.lastActivity);
+                        const minutesAgo = Math.floor((now - lastActivity) / (1000 * 60));
+                        const secondsAgo = Math.floor((now - lastActivity) / 1000);
+                        
+                        const timeAgo = secondsAgo < 60 ? `Hace ${secondsAgo} seg` :
+                                       minutesAgo < 60 ? `Hace ${minutesAgo} min` :
+                                       Math.floor(minutesAgo / 60) < 24 ? `Hace ${Math.floor(minutesAgo / 60)} h` :
+                                       `Hace ${Math.floor(minutesAgo / 1440)} días`;
+                        
+                        const statusIcon = user.isOnline ? '🟢' : '🔴';
+                        const statusText = user.isOnline ? 'Online' : 'Offline';
+                        const statusClass = user.isOnline ? 'tag-success' : 'tag-danger';
+                        
+                        return `
+                            <div style="background: var(--bg-secondary); border-radius: 12px; padding: 20px; border-left: 4px solid ${user.isOnline ? 'var(--success)' : 'var(--danger)'};">
+                                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <div style="width: 40px; height: 40px; border-radius: 50%; background: ${user.isOnline ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
+                                            👤
+                                        </div>
+                                        <div>
+                                            <div style="font-weight: 700; font-size: 1.1rem; color: var(--text-primary);">${user.username}</div>
+                                            <div style="font-size: 0.85rem; color: var(--text-secondary);">${user.totalSessions} sesión${user.totalSessions !== 1 ? 'es' : ''}</div>
+                                        </div>
+                                    </div>
+                                    <span class="tag ${statusClass}">
+                                        ${statusIcon} ${statusText}
+                                    </span>
+                                </div>
+                                
+                                <div style="display: flex; gap: 15px; margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color);">
+                                    <div style="flex: 1;">
+                                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px;">Launcher</div>
+                                        <div style="font-weight: 600; color: var(--text-primary);">🎮 ${user.launcherSessions}</div>
+                                    </div>
+                                    <div style="flex: 1;">
+                                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px;">Panel Web</div>
+                                        <div style="font-weight: 600; color: var(--text-primary);">🌐 ${user.webSessions}</div>
+                                    </div>
+                                </div>
+                                
+                                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color);">
+                                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px;">Última Actividad</div>
+                                    <div style="font-size: 0.9rem; color: var(--text-primary);">${timeAgo}</div>
+                                    <div style="font-size: 0.75rem; color: var(--text-tertiary); margin-top: 4px;">${formatDate(user.lastActivity)}</div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        </div>
+    `;
 }
 
 function renderSessions(sessions) {
