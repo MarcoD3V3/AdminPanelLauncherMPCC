@@ -378,7 +378,7 @@ async function saveAlerts(alerts) {
 }
 
 // Crear alerta
-async function createAlert(title, message, targetUser = null, type = 'info') {
+async function createAlert(title, message, targetUser = null, type = 'info', category = 'alert', metadata = {}) {
     const alerts = await loadAlerts();
     const alert = {
         id: crypto.randomBytes(16).toString('hex'),
@@ -386,7 +386,11 @@ async function createAlert(title, message, targetUser = null, type = 'info') {
         message: message,
         targetUser: targetUser, // null = todos los usuarios
         type: type, // info, warning, error, success
+        category: category, // alert, maintenance, update, event, reward, restriction, config, achievement, promotion, reminder, command
+        metadata: metadata, // Datos adicionales según la categoría
         createdAt: new Date().toISOString(),
+        expiresAt: metadata.expiresAt || null, // Fecha de expiración opcional
+        priority: metadata.priority || 'normal', // low, normal, high, urgent
         read: false,
         readBy: []
     };
@@ -413,10 +417,148 @@ async function markAlertAsRead(alertId, username) {
 // Obtener alertas para un usuario
 async function getUserAlerts(username) {
     const alerts = await loadAlerts();
-    // Retornar alertas globales (targetUser = null) o específicas del usuario
-    return alerts.filter(a => !a.targetUser || a.targetUser === username)
-                 .filter(a => !a.readBy.includes(username))
-                 .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+
+    const now = new Date();
+    
+    // Filtrar alertas: globales o específicas del usuario, no leídas, y no expiradas
+    return alerts.filter(a => {
+        // Filtrar por usuario
+        if (a.targetUser && a.targetUser !== username) return false;
+        
+        // Filtrar alertas ya leídas por este usuario
+        if (a.readBy && a.readBy.includes(username)) return false;
+        
+        // Filtrar alertas expiradas
+        if (a.expiresAt && new Date(a.expiresAt) < now) return false;
+        
+        return true;
+    }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}
+
+// ==================== FUNCIONES HELPER PARA CREAR NOTIFICACIONES ====================
+
+// Crear notificación de mantenimiento
+async function createMaintenanceAlert(title, message, startDate, endDate, serverStatus, targetUser = null) {
+    return await createAlert(
+        title, 
+        message, 
+        targetUser, 
+        'warning', 
+        'maintenance', 
+        { startDate, endDate, serverStatus, priority: 'high' }
+    );
+}
+
+// Crear notificación de actualización
+async function createUpdateAlert(title, message, version, forceUpdate = false, downloadUrl = null, targetUser = null) {
+    return await createAlert(
+        title, 
+        message, 
+        targetUser, 
+        'info', 
+        'update', 
+        { version, forceUpdate, downloadUrl, priority: forceUpdate ? 'urgent' : 'high' }
+    );
+}
+
+// Crear notificación de evento
+async function createEventAlert(title, message, eventDate, duration, eventType, targetUser = null) {
+    return await createAlert(
+        title, 
+        message, 
+        targetUser, 
+        'success', 
+        'event', 
+        { eventDate, duration, eventType, priority: 'normal' }
+    );
+}
+
+// Crear notificación de recompensa
+async function createRewardAlert(title, message, rewardType, rewardValue, rewardCode = null, targetUser = null) {
+    return await createAlert(
+        title, 
+        message, 
+        targetUser, 
+        'success', 
+        'reward', 
+        { rewardType, rewardValue, rewardCode, priority: 'normal' }
+    );
+}
+
+// Crear notificación de restricción
+async function createRestrictionAlert(title, message, restrictionType, duration, reason, targetUser) {
+    if (!targetUser) {
+        throw new Error('Las restricciones deben ser para un usuario específico');
+    }
+    return await createAlert(
+        title, 
+        message, 
+        targetUser, 
+        'error', 
+        'restriction', 
+        { restrictionType, duration, reason, priority: 'high' }
+    );
+}
+
+// Crear notificación de configuración
+async function createConfigAlert(title, message, serverIp, serverPort, mcVersion, autoApply = false, targetUser = null) {
+    return await createAlert(
+        title, 
+        message, 
+        targetUser, 
+        'info', 
+        'config', 
+        { serverIp, serverPort, mcVersion, autoApply, priority: 'high' }
+    );
+}
+
+// Crear notificación de logro
+async function createAchievementAlert(title, message, achievementName, level, points, targetUser) {
+    return await createAlert(
+        title, 
+        message, 
+        targetUser, 
+        'success', 
+        'achievement', 
+        { achievementName, level, points, priority: 'normal' }
+    );
+}
+
+// Crear notificación de promoción
+async function createPromotionAlert(title, message, promoType, promoCode, discount, expiresAt, targetUser = null) {
+    return await createAlert(
+        title, 
+        message, 
+        targetUser, 
+        'success', 
+        'promotion', 
+        { promoType, promoCode, discount, expiresAt, priority: 'normal' }
+    );
+}
+
+// Crear notificación de recordatorio
+async function createReminderAlert(title, message, reminderDate, reminderType, targetUser = null) {
+    return await createAlert(
+        title, 
+        message, 
+        targetUser, 
+        'info', 
+        'reminder', 
+        { reminderDate, reminderType, priority: 'normal' }
+    );
+}
+
+// Crear notificación de comando
+async function createCommandAlert(title, message, command, params = {}, targetUser = null) {
+    return await createAlert(
+        title, 
+        message, 
+        targetUser, 
+        'warning', 
+        'command', 
+        { command, params, priority: 'high' }
+    );
 }
 
 // Cargar configuración
@@ -508,18 +650,45 @@ async function saveUsers(users) {
 
 // Verificar credenciales
 async function verifyCredentials(username, password) {
+    // Limpiar espacios en blanco
+    const cleanUsername = (username || '').trim();
+    const cleanPassword = (password || '').trim();
+    
+    if (!cleanUsername || !cleanPassword) {
+        console.log('⚠️ Credenciales vacías después de trim');
+        return null;
+    }
+    
     const users = await loadUsers();
-    const user = users.find(u => u.username === username);
+    
+    // Buscar usuario (case-insensitive para mayor flexibilidad)
+    const user = users.find(u => u.username && u.username.trim().toLowerCase() === cleanUsername.toLowerCase());
     
     if (!user) {
+        console.log(`⚠️ Usuario no encontrado: "${cleanUsername}" (buscado en: ${users.map(u => u.username).join(', ')})`);
         return null;
     }
     
-    const isValid = await bcrypt.compare(password, user.password);
+    // Verificar que el usuario tenga contraseña
+    if (!user.password) {
+        console.log(`⚠️ Usuario "${user.username}" no tiene contraseña guardada`);
+        return null;
+    }
+    
+    // Comparar contraseña
+    const isValid = await bcrypt.compare(cleanPassword, user.password);
+    
     if (!isValid) {
+        console.log(`⚠️ Contraseña incorrecta para usuario: "${user.username}"`);
+        // Log adicional para debug (solo en desarrollo)
+        if (process.env.NODE_ENV === 'development') {
+            console.log(`   - Contraseña recibida (longitud): ${cleanPassword.length}`);
+            console.log(`   - Hash guardado (prefijo): ${user.password.substring(0, 10)}...`);
+        }
         return null;
     }
     
+    console.log(`✅ Login exitoso para usuario: "${user.username}"`);
     return { username: user.username, role: user.role || 'user' };
 }
 
@@ -567,11 +736,15 @@ app.post('/api/auth/login', apiLimiter, async (req, res) => {
         const { username, password } = req.body;
         const ip = getClientIp(req);
         
-        if (!username || !password) {
+        // Limpiar espacios en blanco
+        const cleanUsername = (username || '').trim();
+        const cleanPassword = (password || '').trim();
+        
+        if (!cleanUsername || !cleanPassword) {
             return res.status(400).json({ error: 'Usuario y contraseña requeridos' });
         }
         
-        const user = await verifyCredentials(username, password);
+        const user = await verifyCredentials(cleanUsername, cleanPassword);
         
         if (!user) {
             await addLog('LOGIN_FAILED', { username, ip }, ip);
@@ -658,15 +831,19 @@ app.post('/api/users', authenticateToken, apiLimiter, async (req, res) => {
         const { username, password, role = 'user' } = req.body;
         const ip = getClientIp(req);
         
-        if (!username || !password) {
+        // Limpiar espacios en blanco
+        const cleanUsername = (username || '').trim();
+        const cleanPassword = (password || '').trim();
+        
+        if (!cleanUsername || !cleanPassword) {
             return res.status(400).json({ error: 'Usuario y contraseña requeridos' });
         }
         
-        if (username.length < 3) {
+        if (cleanUsername.length < 3) {
             return res.status(400).json({ error: 'El nombre de usuario debe tener al menos 3 caracteres' });
         }
         
-        if (password.length < 6) {
+        if (cleanPassword.length < 6) {
             return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
         }
         
@@ -677,15 +854,15 @@ app.post('/api/users', authenticateToken, apiLimiter, async (req, res) => {
         
         const users = await loadUsers();
         
-        // Verificar que el usuario no exista
-        if (users.find(u => u.username === username)) {
+        // Verificar que el usuario no exista (case-insensitive)
+        if (users.find(u => u.username && u.username.trim().toLowerCase() === cleanUsername.toLowerCase())) {
             return res.status(400).json({ error: 'El usuario ya existe' });
         }
         
         // Crear nuevo usuario
         const newUser = {
-            username: username,
-            password: await bcrypt.hash(password, 10),
+            username: cleanUsername,
+            password: await bcrypt.hash(cleanPassword, 10),
             role: role,
             createdAt: new Date().toISOString(),
             createdBy: req.user.username
@@ -694,7 +871,9 @@ app.post('/api/users', authenticateToken, apiLimiter, async (req, res) => {
         users.push(newUser);
         await saveUsers(users);
         
-        await addLog('USER_CREATED', { username, role, createdBy: req.user.username }, ip);
+        await addLog('USER_CREATED', { username: cleanUsername, role, createdBy: req.user.username }, ip);
+        
+        console.log(`✅ Usuario creado: "${cleanUsername}" con rol "${role}"`);
         
         res.json({
             success: true,
@@ -1312,17 +1491,18 @@ app.post('/api/alerts', authenticateToken, apiLimiter, async (req, res) => {
             return res.status(403).json({ error: 'Solo los administradores pueden crear alertas' });
         }
         
-        const { title, message, targetUser, type = 'info' } = req.body;
+        const { title, message, targetUser, type = 'info', category = 'alert', metadata = {} } = req.body;
         const ip = getClientIp(req);
         
         if (!title || !message) {
             return res.status(400).json({ error: 'Título y mensaje requeridos' });
         }
         
-        const alert = await createAlert(title, message, targetUser || null, type);
+        const alert = await createAlert(title, message, targetUser || null, type, category, metadata);
         await addLog('ALERT_CREATED', { 
             alertId: alert.id, 
             title, 
+            category,
             targetUser: targetUser || 'all',
             createdBy: req.user.username 
         }, ip);
@@ -1360,6 +1540,42 @@ app.delete('/api/alerts/:alertId', authenticateToken, apiLimiter, async (req, re
         
         await addLog('ALERT_DELETED', { alertId, deletedBy: req.user.username }, getClientIp(req));
         res.json({ success: true, message: 'Alerta eliminada exitosamente' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Desactivar modo mantenimiento (requiere autenticación y rol admin)
+app.post('/api/maintenance/disable', authenticateToken, apiLimiter, async (req, res) => {
+    try {
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ error: 'Solo los administradores pueden desactivar mantenimiento' });
+        }
+        
+        const ip = getClientIp(req);
+        const alerts = await loadAlerts();
+        
+        // Buscar y actualizar todas las alertas de mantenimiento activas
+        let updated = false;
+        const updatedAlerts = alerts.map(alert => {
+            if (alert.category === 'maintenance' && alert.metadata && alert.metadata.serverStatus) {
+                // Cambiar estado a "online" y agregar fecha de fin si no existe
+                alert.metadata.serverStatus = 'online';
+                if (!alert.metadata.endDate) {
+                    alert.metadata.endDate = new Date().toISOString();
+                }
+                updated = true;
+            }
+            return alert;
+        });
+        
+        if (updated) {
+            await saveAlerts(updatedAlerts);
+            await addLog('MAINTENANCE_DISABLED', { disabledBy: req.user.username }, ip);
+            res.json({ success: true, message: 'Modo mantenimiento desactivado exitosamente' });
+        } else {
+            res.json({ success: true, message: 'No hay mantenimiento activo para desactivar' });
+        }
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

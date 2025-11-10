@@ -570,34 +570,194 @@ async function loadAlerts() {
     }
 }
 
+// Función para obtener el icono según la categoría
+function getCategoryIcon(category) {
+    const icons = {
+        'alert': 'fa-bell',
+        'maintenance': 'fa-tools',
+        'update': 'fa-download',
+        'event': 'fa-calendar-star',
+        'reward': 'fa-gift',
+        'restriction': 'fa-ban',
+        'config': 'fa-cog',
+        'achievement': 'fa-trophy',
+        'promotion': 'fa-tag',
+        'reminder': 'fa-clock',
+        'command': 'fa-terminal'
+    };
+    return icons[category] || 'fa-bell';
+}
+
+// Función para obtener el nombre de la categoría
+function getCategoryName(category) {
+    const names = {
+        'alert': 'Alerta General',
+        'maintenance': 'Mantenimiento',
+        'update': 'Actualización',
+        'event': 'Evento Especial',
+        'reward': 'Recompensa',
+        'restriction': 'Restricción',
+        'config': 'Configuración',
+        'achievement': 'Logro',
+        'promotion': 'Promoción',
+        'reminder': 'Recordatorio',
+        'command': 'Comando'
+    };
+    return names[category] || 'Alerta';
+}
+
+// Función para formatear metadata según la categoría
+function formatAlertMetadata(alert) {
+    if (!alert.metadata) return '';
+    
+    const meta = alert.metadata;
+    let html = '<div class="alert-metadata">';
+    
+    switch(alert.category) {
+        case 'maintenance':
+            if (meta.startDate) html += `<div><i class="fas fa-calendar"></i> Inicio: ${formatDate(meta.startDate)}</div>`;
+            if (meta.endDate) html += `<div><i class="fas fa-calendar-check"></i> Fin: ${formatDate(meta.endDate)}</div>`;
+            if (meta.serverStatus) html += `<div><i class="fas fa-server"></i> Estado: ${meta.serverStatus}</div>`;
+            break;
+        case 'update':
+            if (meta.version) html += `<div><i class="fas fa-code-branch"></i> Versión: ${meta.version}</div>`;
+            if (meta.forceUpdate) html += `<div><i class="fas fa-exclamation-triangle"></i> Actualización Forzada</div>`;
+            if (meta.downloadUrl) html += `<div><i class="fas fa-link"></i> <a href="${meta.downloadUrl}" target="_blank">Descargar</a></div>`;
+            break;
+        case 'event':
+            if (meta.eventDate) html += `<div><i class="fas fa-calendar"></i> Fecha: ${formatDate(meta.eventDate)}</div>`;
+            if (meta.duration) html += `<div><i class="fas fa-hourglass-half"></i> Duración: ${meta.duration}h</div>`;
+            if (meta.eventType) html += `<div><i class="fas fa-star"></i> Tipo: ${meta.eventType}</div>`;
+            break;
+        case 'reward':
+            if (meta.rewardType) html += `<div><i class="fas fa-gift"></i> Tipo: ${meta.rewardType}</div>`;
+            if (meta.rewardValue) html += `<div><i class="fas fa-coins"></i> Valor: ${meta.rewardValue}</div>`;
+            if (meta.rewardCode) html += `<div><i class="fas fa-ticket-alt"></i> Código: <strong>${meta.rewardCode}</strong></div>`;
+            break;
+        case 'restriction':
+            if (meta.restrictionType) html += `<div><i class="fas fa-shield-alt"></i> Tipo: ${meta.restrictionType}</div>`;
+            if (meta.duration !== undefined) html += `<div><i class="fas fa-clock"></i> Duración: ${meta.duration === 0 ? 'Permanente' : meta.duration + ' días'}</div>`;
+            if (meta.reason) html += `<div><i class="fas fa-info-circle"></i> Razón: ${meta.reason}</div>`;
+            break;
+        case 'config':
+            if (meta.serverIp) html += `<div><i class="fas fa-network-wired"></i> IP: ${meta.serverIp}</div>`;
+            if (meta.serverPort) html += `<div><i class="fas fa-plug"></i> Puerto: ${meta.serverPort}</div>`;
+            if (meta.mcVersion) html += `<div><i class="fas fa-cube"></i> Versión MC: ${meta.mcVersion}</div>`;
+            if (meta.autoApply) html += `<div><i class="fas fa-magic"></i> Aplicación Automática</div>`;
+            break;
+        case 'achievement':
+            if (meta.achievementName) html += `<div><i class="fas fa-trophy"></i> Logro: ${meta.achievementName}</div>`;
+            if (meta.level) html += `<div><i class="fas fa-level-up-alt"></i> ${meta.level}</div>`;
+            if (meta.points) html += `<div><i class="fas fa-star"></i> Puntos: ${meta.points}</div>`;
+            break;
+        case 'promotion':
+            if (meta.promoType) html += `<div><i class="fas fa-tag"></i> Tipo: ${meta.promoType}</div>`;
+            if (meta.promoCode) html += `<div><i class="fas fa-ticket-alt"></i> Código: <strong>${meta.promoCode}</strong></div>`;
+            if (meta.discount) html += `<div><i class="fas fa-percent"></i> Descuento: ${meta.discount}%</div>`;
+            if (meta.expiresAt) html += `<div><i class="fas fa-calendar-times"></i> Expira: ${formatDate(meta.expiresAt)}</div>`;
+            break;
+        case 'reminder':
+            if (meta.reminderDate) html += `<div><i class="fas fa-clock"></i> Recordatorio: ${formatDate(meta.reminderDate)}</div>`;
+            if (meta.reminderType) html += `<div><i class="fas fa-bell"></i> Tipo: ${meta.reminderType}</div>`;
+            break;
+        case 'command':
+            if (meta.command) html += `<div><i class="fas fa-terminal"></i> Comando: ${meta.command}</div>`;
+            if (meta.params) html += `<div><i class="fas fa-code"></i> Parámetros: ${JSON.stringify(meta.params)}</div>`;
+            break;
+    }
+    
+    if (meta.priority && meta.priority !== 'normal') {
+        html += `<div><i class="fas fa-exclamation-circle"></i> Prioridad: ${meta.priority}</div>`;
+    }
+    
+    html += '</div>';
+    return html;
+}
+
 function renderAlerts(alerts) {
     const container = document.getElementById('alerts-container');
     if (!container) return;
+    
+    // Verificar si hay mantenimiento activo
+    const hasActiveMaintenance = alerts.some(alert => 
+        alert.category === 'maintenance' && 
+        alert.metadata && 
+        (alert.metadata.serverStatus === 'maintenance' || alert.metadata.serverStatus === 'offline')
+    );
+    
+    // Mostrar/ocultar botón de desactivar mantenimiento
+    const disableMaintenanceBtn = document.getElementById('disable-maintenance-btn');
+    if (disableMaintenanceBtn) {
+        disableMaintenanceBtn.style.display = hasActiveMaintenance ? 'inline-flex' : 'none';
+    }
     
     if (alerts.length === 0) {
         container.innerHTML = '<p style="text-align: center; padding: 40px; color: var(--text-secondary);">No hay alertas</p>';
         return;
     }
     
-    container.innerHTML = alerts.map(alert => `
-        <div class="alert-card alert-${alert.type}">
+    // Ordenar por fecha (más recientes primero)
+    alerts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    
+    // Guardar alertas en variable global para acceso desde el modal
+    window.currentAlerts = alerts;
+    
+    container.innerHTML = alerts.map(alert => {
+        const categoryIcon = getCategoryIcon(alert.category || 'alert');
+        const categoryName = getCategoryName(alert.category || 'alert');
+        const metadata = formatAlertMetadata(alert);
+        
+        return `
+        <div class="alert-card alert-${alert.type}" onclick="showAlertDetails('${alert.id}')" style="cursor: pointer;">
             <div class="alert-header">
-                <h4>${alert.title}</h4>
+                <div class="alert-title-section">
+                    <i class="fas ${categoryIcon}"></i>
+                    <h4>${alert.title}</h4>
+                    <span class="alert-category-badge">${categoryName}</span>
+                </div>
                 <div class="alert-meta">
-                    <span>${alert.targetUser || 'Todos los usuarios'}</span>
-                    <span>${formatDate(alert.createdAt)}</span>
+                    <span><i class="fas fa-user"></i> ${alert.targetUser || 'Todos los usuarios'}</span>
+                    <span><i class="fas fa-clock"></i> ${formatDate(alert.createdAt)}</span>
                 </div>
             </div>
             <div class="alert-body">
                 <p>${alert.message}</p>
+                ${metadata}
             </div>
-            <div class="alert-actions">
+            <div class="alert-actions" onclick="event.stopPropagation()">
                 <button class="btn btn-sm btn-danger" onclick="deleteAlert('${alert.id}')">
                     <i class="fas fa-trash"></i> Eliminar
                 </button>
             </div>
         </div>
-    `).join('');
+    `;
+    }).join('');
+}
+
+// Desactivar modo mantenimiento
+async function disableMaintenanceMode() {
+    if (!confirm('¿Estás seguro de que quieres desactivar el modo mantenimiento? Esto permitirá que los usuarios usen el launcher nuevamente.')) {
+        return;
+    }
+    
+    try {
+        const response = await authenticatedFetch(`${API_URL}/maintenance/disable`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            showNotification(result.message || 'Modo mantenimiento desactivado exitosamente', 'success');
+            loadAlerts(); // Recargar alertas para actualizar la vista
+        } else {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al desactivar mantenimiento');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showNotification('Error al desactivar mantenimiento: ' + error.message, 'error');
+    }
 }
 
 function showCreateAlertModal() {
@@ -606,7 +766,160 @@ function showCreateAlertModal() {
     document.getElementById('alert-message').value = '';
     document.getElementById('alert-target-user').value = '';
     document.getElementById('alert-type').value = 'info';
+    document.getElementById('alert-category').value = 'alert';
+    document.getElementById('alert-priority').value = 'normal';
     document.getElementById('create-alert-error').style.display = 'none';
+    updateAlertFields();
+}
+
+// Actualizar campos según la categoría seleccionada
+function updateAlertFields() {
+    const category = document.getElementById('alert-category').value;
+    const metadataFields = document.getElementById('alert-metadata-fields');
+    
+    let fieldsHTML = '';
+    
+    switch(category) {
+        case 'maintenance':
+            fieldsHTML = `
+                <label>Fecha/Hora de Inicio:</label>
+                <input type="datetime-local" id="metadata-startDate">
+                <label>Fecha/Hora de Fin (opcional):</label>
+                <input type="datetime-local" id="metadata-endDate">
+                <label>Estado del Servidor:</label>
+                <select id="metadata-serverStatus">
+                    <option value="offline">Offline</option>
+                    <option value="maintenance">En Mantenimiento</option>
+                    <option value="online">Online</option>
+                </select>
+            `;
+            break;
+        case 'update':
+            fieldsHTML = `
+                <label>Versión del Launcher:</label>
+                <input type="text" id="metadata-version" placeholder="Ej: 1.2.0">
+                <label>Forzar Actualización:</label>
+                <select id="metadata-forceUpdate">
+                    <option value="false">No</option>
+                    <option value="true">Sí</option>
+                </select>
+                <label>URL de Descarga (opcional):</label>
+                <input type="url" id="metadata-downloadUrl" placeholder="https://...">
+            `;
+            break;
+        case 'event':
+            fieldsHTML = `
+                <label>Fecha/Hora del Evento:</label>
+                <input type="datetime-local" id="metadata-eventDate">
+                <label>Duración (horas):</label>
+                <input type="number" id="metadata-duration" placeholder="2" min="1">
+                <label>Tipo de Evento:</label>
+                <select id="metadata-eventType">
+                    <option value="tournament">Torneo</option>
+                    <option value="special">Especial</option>
+                    <option value="seasonal">Temporal</option>
+                </select>
+            `;
+            break;
+        case 'reward':
+            fieldsHTML = `
+                <label>Tipo de Recompensa:</label>
+                <select id="metadata-rewardType">
+                    <option value="daily">Diaria</option>
+                    <option value="bonus">Bono</option>
+                    <option value="code">Código</option>
+                </select>
+                <label>Valor/Cantidad:</label>
+                <input type="text" id="metadata-rewardValue" placeholder="Ej: 100 monedas, XP x2">
+                <label>Código de Canje (si aplica):</label>
+                <input type="text" id="metadata-rewardCode" placeholder="CÓDIGO123">
+            `;
+            break;
+        case 'restriction':
+            fieldsHTML = `
+                <label>Tipo de Restricción:</label>
+                <select id="metadata-restrictionType">
+                    <option value="ban">Ban</option>
+                    <option value="suspension">Suspensión</option>
+                    <option value="warning">Advertencia</option>
+                </select>
+                <label>Duración (días, 0 = permanente):</label>
+                <input type="number" id="metadata-duration" placeholder="0" min="0">
+                <label>Razón:</label>
+                <textarea id="metadata-reason" rows="2" placeholder="Razón de la restricción"></textarea>
+            `;
+            break;
+        case 'config':
+            fieldsHTML = `
+                <label>IP del Servidor:</label>
+                <input type="text" id="metadata-serverIp" placeholder="192.168.1.1">
+                <label>Puerto:</label>
+                <input type="number" id="metadata-serverPort" placeholder="25565">
+                <label>Versión de Minecraft:</label>
+                <input type="text" id="metadata-mcVersion" placeholder="1.20.1">
+                <label>Aplicar Automáticamente:</label>
+                <select id="metadata-autoApply">
+                    <option value="false">No</option>
+                    <option value="true">Sí</option>
+                </select>
+            `;
+            break;
+        case 'achievement':
+            fieldsHTML = `
+                <label>Nombre del Logro:</label>
+                <input type="text" id="metadata-achievementName" placeholder="Primer Paso">
+                <label>Nivel/Progreso:</label>
+                <input type="text" id="metadata-level" placeholder="Nivel 5">
+                <label>Puntos:</label>
+                <input type="number" id="metadata-points" placeholder="100" min="0">
+            `;
+            break;
+        case 'promotion':
+            fieldsHTML = `
+                <label>Tipo de Promoción:</label>
+                <select id="metadata-promoType">
+                    <option value="discount">Descuento</option>
+                    <option value="code">Código Promocional</option>
+                    <option value="offer">Oferta Especial</option>
+                </select>
+                <label>Código Promocional:</label>
+                <input type="text" id="metadata-promoCode" placeholder="PROMO2025">
+                <label>Descuento (%):</label>
+                <input type="number" id="metadata-discount" placeholder="20" min="0" max="100">
+                <label>Fecha de Expiración:</label>
+                <input type="datetime-local" id="metadata-expiresAt">
+            `;
+            break;
+        case 'reminder':
+            fieldsHTML = `
+                <label>Fecha/Hora del Recordatorio:</label>
+                <input type="datetime-local" id="metadata-reminderDate">
+                <label>Tipo:</label>
+                <select id="metadata-reminderType">
+                    <option value="event">Evento Próximo</option>
+                    <option value="task">Tarea Pendiente</option>
+                    <option value="friend">Amigo Conectado</option>
+                </select>
+            `;
+            break;
+        case 'command':
+            fieldsHTML = `
+                <label>Comando a Ejecutar:</label>
+                <select id="metadata-command">
+                    <option value="update">Forzar Actualización</option>
+                    <option value="restart">Reiniciar Launcher</option>
+                    <option value="config">Cambiar Configuración</option>
+                    <option value="clear">Limpiar Caché</option>
+                </select>
+                <label>Parámetros (JSON, opcional):</label>
+                <textarea id="metadata-params" rows="3" placeholder='{"key": "value"}'></textarea>
+            `;
+            break;
+        default:
+            fieldsHTML = '';
+    }
+    
+    metadataFields.innerHTML = fieldsHTML;
 }
 
 function closeCreateAlertModal() {
@@ -618,6 +931,8 @@ function confirmCreateAlert() {
     const message = document.getElementById('alert-message').value.trim();
     const targetUser = document.getElementById('alert-target-user').value.trim() || null;
     const type = document.getElementById('alert-type').value;
+    const category = document.getElementById('alert-category').value;
+    const priority = document.getElementById('alert-priority').value;
     const errorDiv = document.getElementById('create-alert-error');
     
     if (!title || !message) {
@@ -626,41 +941,205 @@ function confirmCreateAlert() {
         return;
     }
     
-    sendAlert(title, message, targetUser, type);
+    // Recopilar metadata según la categoría
+    const metadata = { priority };
+    
+    // Agregar campos específicos según la categoría
+    switch(category) {
+        case 'maintenance':
+            const startDate = document.getElementById('metadata-startDate')?.value;
+            const endDate = document.getElementById('metadata-endDate')?.value;
+            const serverStatus = document.getElementById('metadata-serverStatus')?.value;
+            if (startDate) metadata.startDate = new Date(startDate).toISOString();
+            if (endDate) metadata.endDate = new Date(endDate).toISOString();
+            if (serverStatus) metadata.serverStatus = serverStatus;
+            break;
+        case 'update':
+            const version = document.getElementById('metadata-version')?.value;
+            const forceUpdate = document.getElementById('metadata-forceUpdate')?.value === 'true';
+            const downloadUrl = document.getElementById('metadata-downloadUrl')?.value;
+            if (version) metadata.version = version;
+            metadata.forceUpdate = forceUpdate;
+            if (downloadUrl) metadata.downloadUrl = downloadUrl;
+            break;
+        case 'event':
+            const eventDate = document.getElementById('metadata-eventDate')?.value;
+            const duration = document.getElementById('metadata-duration')?.value;
+            const eventType = document.getElementById('metadata-eventType')?.value;
+            if (eventDate) metadata.eventDate = new Date(eventDate).toISOString();
+            if (duration) metadata.duration = parseInt(duration);
+            if (eventType) metadata.eventType = eventType;
+            break;
+        case 'reward':
+            const rewardType = document.getElementById('metadata-rewardType')?.value;
+            const rewardValue = document.getElementById('metadata-rewardValue')?.value;
+            const rewardCode = document.getElementById('metadata-rewardCode')?.value;
+            if (rewardType) metadata.rewardType = rewardType;
+            if (rewardValue) metadata.rewardValue = rewardValue;
+            if (rewardCode) metadata.rewardCode = rewardCode;
+            break;
+        case 'restriction':
+            const restrictionType = document.getElementById('metadata-restrictionType')?.value;
+            const restrictionDuration = document.getElementById('metadata-duration')?.value;
+            const reason = document.getElementById('metadata-reason')?.value;
+            if (restrictionType) metadata.restrictionType = restrictionType;
+            if (restrictionDuration) metadata.duration = parseInt(restrictionDuration);
+            if (reason) metadata.reason = reason;
+            break;
+        case 'config':
+            const serverIp = document.getElementById('metadata-serverIp')?.value;
+            const serverPort = document.getElementById('metadata-serverPort')?.value;
+            const mcVersion = document.getElementById('metadata-mcVersion')?.value;
+            const autoApply = document.getElementById('metadata-autoApply')?.value === 'true';
+            if (serverIp) metadata.serverIp = serverIp;
+            if (serverPort) metadata.serverPort = parseInt(serverPort);
+            if (mcVersion) metadata.mcVersion = mcVersion;
+            metadata.autoApply = autoApply;
+            break;
+        case 'achievement':
+            const achievementName = document.getElementById('metadata-achievementName')?.value;
+            const level = document.getElementById('metadata-level')?.value;
+            const points = document.getElementById('metadata-points')?.value;
+            if (achievementName) metadata.achievementName = achievementName;
+            if (level) metadata.level = level;
+            if (points) metadata.points = parseInt(points);
+            break;
+        case 'promotion':
+            const promoType = document.getElementById('metadata-promoType')?.value;
+            const promoCode = document.getElementById('metadata-promoCode')?.value;
+            const discount = document.getElementById('metadata-discount')?.value;
+            const expiresAt = document.getElementById('metadata-expiresAt')?.value;
+            if (promoType) metadata.promoType = promoType;
+            if (promoCode) metadata.promoCode = promoCode;
+            if (discount) metadata.discount = parseInt(discount);
+            if (expiresAt) metadata.expiresAt = new Date(expiresAt).toISOString();
+            break;
+        case 'reminder':
+            const reminderDate = document.getElementById('metadata-reminderDate')?.value;
+            const reminderType = document.getElementById('metadata-reminderType')?.value;
+            if (reminderDate) metadata.reminderDate = new Date(reminderDate).toISOString();
+            if (reminderType) metadata.reminderType = reminderType;
+            break;
+        case 'command':
+            const command = document.getElementById('metadata-command')?.value;
+            const params = document.getElementById('metadata-params')?.value;
+            if (command) metadata.command = command;
+            if (params) {
+                try {
+                    metadata.params = JSON.parse(params);
+                } catch (e) {
+                    errorDiv.textContent = 'Error en formato JSON de parámetros';
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+            }
+            break;
+    }
+    
+    sendAlert(title, message, targetUser, type, category, metadata);
     closeCreateAlertModal();
 }
 
 function sendAlertToUser(username) {
-    document.getElementById('create-alert-modal').classList.add('show');
-    document.getElementById('alert-title').value = '';
-    document.getElementById('alert-message').value = '';
+    showCreateAlertModal();
     document.getElementById('alert-target-user').value = username;
-    document.getElementById('alert-type').value = 'info';
-    document.getElementById('create-alert-error').style.display = 'none';
 }
 
 function showSendAlertToSessionModal() {
     showCreateAlertModal();
 }
 
-async function sendAlert(title, message, targetUser, type = 'info') {
+async function sendAlert(title, message, targetUser, type = 'info', category = 'alert', metadata = {}) {
     try {
         const response = await authenticatedFetch(`${API_URL}/alerts`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title, message, targetUser, type })
+            body: JSON.stringify({ title, message, targetUser, type, category, metadata })
         });
         
         if (response.ok) {
-            showNotification('Alerta enviada exitosamente', 'success');
+            showNotification('Notificación enviada exitosamente', 'success');
             loadAlerts();
         } else {
-            throw new Error('Error al enviar alerta');
+            throw new Error('Error al enviar notificación');
         }
     } catch (error) {
-        showNotification('Error al enviar alerta: ' + error.message, 'error');
+        showNotification('Error al enviar notificación: ' + error.message, 'error');
     }
 }
+
+// Mostrar detalles completos de una alerta
+function showAlertDetails(alertId) {
+    if (!window.currentAlerts) {
+        showNotification('Error: No se encontraron alertas', 'error');
+        return;
+    }
+    
+    const alert = window.currentAlerts.find(a => a.id === alertId);
+    if (!alert) {
+        showNotification('Error: Alerta no encontrada', 'error');
+        return;
+    }
+    
+    const modal = document.getElementById('alert-details-modal');
+    if (!modal) {
+        showNotification('Error: Modal no encontrado', 'error');
+        return;
+    }
+    
+    // Llenar el modal con los datos de la alerta
+    document.getElementById('alert-details-id').textContent = alert.id;
+    document.getElementById('alert-details-title').textContent = alert.title;
+    document.getElementById('alert-details-message').textContent = alert.message;
+    document.getElementById('alert-details-category').textContent = getCategoryName(alert.category || 'alert');
+    document.getElementById('alert-details-category').innerHTML = `<i class="fas ${getCategoryIcon(alert.category || 'alert')}"></i> ${getCategoryName(alert.category || 'alert')}`;
+    document.getElementById('alert-details-type').textContent = alert.type;
+    document.getElementById('alert-details-priority').textContent = alert.metadata?.priority || 'normal';
+    document.getElementById('alert-details-target').textContent = alert.targetUser || 'Todos los usuarios';
+    document.getElementById('alert-details-created').textContent = formatDate(alert.createdAt);
+    document.getElementById('alert-details-expires').textContent = alert.expiresAt ? formatDate(alert.expiresAt) : 'No expira';
+    document.getElementById('alert-details-read').textContent = alert.read ? 'Sí' : 'No';
+    document.getElementById('alert-details-readBy').textContent = alert.readBy && alert.readBy.length > 0 ? alert.readBy.join(', ') : 'Ninguno';
+    
+    // Mostrar metadata completa
+    const metadataContainer = document.getElementById('alert-details-metadata');
+    if (alert.metadata && Object.keys(alert.metadata).length > 0) {
+        metadataContainer.innerHTML = '<pre>' + JSON.stringify(alert.metadata, null, 2) + '</pre>';
+    } else {
+        metadataContainer.innerHTML = '<p style="color: var(--text-secondary);">No hay metadata adicional</p>';
+    }
+    
+    // Mostrar el modal
+    modal.classList.add('show');
+}
+
+// Cerrar modal de detalles
+function closeAlertDetailsModal() {
+    const modal = document.getElementById('alert-details-modal');
+    if (modal) {
+        modal.classList.remove('show');
+    }
+}
+
+// Cerrar modal al hacer clic fuera de él o con ESC
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('alert-details-modal');
+    if (modal) {
+        // Cerrar al hacer clic fuera del modal
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                closeAlertDetailsModal();
+            }
+        });
+        
+        // Cerrar con tecla ESC
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && modal.classList.contains('show')) {
+                closeAlertDetailsModal();
+            }
+        });
+    }
+});
 
 async function deleteAlert(alertId) {
     if (!confirm('¿Estás seguro de eliminar esta alerta?')) return;
@@ -673,6 +1152,7 @@ async function deleteAlert(alertId) {
         if (response.ok) {
             showNotification('Alerta eliminada exitosamente', 'success');
             loadAlerts();
+            closeAlertDetailsModal(); // Cerrar el modal si está abierto
         } else {
             throw new Error('Error al eliminar alerta');
         }

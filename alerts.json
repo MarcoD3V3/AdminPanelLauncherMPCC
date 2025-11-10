@@ -1,0 +1,97 @@
+[
+  {
+    "id": "693fef7b0b4f6398e0b381f1f9674b4d",
+    "title": "Mantenimiento",
+    "message": "el launcher se va a actualizar",
+    "targetUser": null,
+    "type": "warning",
+    "category": "maintenance",
+    "metadata": {
+      "priority": "high",
+      "startDate": "0111-11-11T19:11:12.000Z",
+      "endDate": "2222-02-22T19:02:00.000Z",
+      "serverStatus": "maintenance"
+    },
+    "createdAt": "2025-11-10T07:48:28.133Z",
+    "expiresAt": null,
+    "priority": "high",
+    "read": true,
+    "readBy": [
+      "123123"
+    ]
+  },
+  {
+    "id": "a41bbb956b700473b8855c4a12124ece",
+    "title": "awdawd",
+    "message": "dawdawd",
+    "targetUser": null,
+    "type": "warning",
+    "category": "update",
+    "metadata": {
+      "priority": "high",
+      "version": "dawd",
+      "forceUpdate": true
+    },
+    "createdAt": "2025-11-10T07:53:34.068Z",
+    "expiresAt": null,
+    "priority": "high",
+    "read": true,
+    "readBy": [
+      "123123"
+    ]
+  },
+  {
+    "id": "ead7e88126ecbc24cd910a28f8a9c499",
+    "title": "vxvxcvxcvcxv",
+    "message": "cvxcvxvvxcvvf",
+    "targetUser": "fff",
+    "type": "info",
+    "category": "reminder",
+    "metadata": {
+      "priority": "normal",
+      "reminderDate": "2026-01-01T04:58:00.000Z",
+      "reminderType": "task"
+    },
+    "createdAt": "2025-11-10T07:58:01.899Z",
+    "expiresAt": null,
+    "priority": "normal",
+    "read": false,
+    "readBy": []
+  },
+  {
+    "id": "1e8e96c768c13ca45a1dd65fbb4cf818",
+    "title": "ererererr",
+    "message": "erfff",
+    "targetUser": null,
+    "type": "error",
+    "category": "event",
+    "metadata": {
+      "priority": "normal",
+      "eventType": "tournament"
+    },
+    "createdAt": "2025-11-10T07:58:31.386Z",
+    "expiresAt": null,
+    "priority": "normal",
+    "read": true,
+    "readBy": [
+      "123123"
+    ]
+  },
+  {
+    "id": "9f9bd6e0c007d8df3111d81e1ae01a46",
+    "title": "dddcdsdf",
+    "message": "fsfe",
+    "targetUser": null,
+    "type": "info",
+    "category": "maintenance",
+    "metadata": {
+      "priority": "normal",
+      "serverStatus": "offline"
+    },
+    "createdAt": "2025-11-10T08:07:14.039Z",
+    "expiresAt": null,
+    "priority": "normal",
+    "read": false,
+    "readBy": []
+  }
+]

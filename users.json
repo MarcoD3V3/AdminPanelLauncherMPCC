@@ -11,5 +11,12 @@
     "role": "user",
     "createdAt": "2025-11-10T05:36:03.279Z",
     "createdBy": "admin"
+  },
+  {
+    "username": "Nando",
+    "password": "$2a$10$dG9SKh/d856qfnQHaC8pJ.ua0xPipUv8QQhU.FKQRJwF1ByV5NwL6",
+    "role": "user",
+    "createdAt": "2025-11-10T17:09:24.566Z",
+    "createdBy": "admin"
   }
 ]

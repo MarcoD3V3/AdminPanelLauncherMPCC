@@ -116,5 +116,93 @@
     },
     "ip": "::1",
     "timestamp": "2025-11-10T05:36:14.687Z"
+  },
+  {
+    "action": "LOGIN_SUCCESS",
+    "details": {
+      "username": "admin",
+      "ip": "::1"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T07:32:22.785Z"
+  },
+  {
+    "action": "LOGIN_SUCCESS",
+    "details": {
+      "username": "123123",
+      "ip": "::1"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T07:46:23.780Z"
+  },
+  {
+    "action": "ALERT_CREATED",
+    "details": {
+      "alertId": "693fef7b0b4f6398e0b381f1f9674b4d",
+      "title": "Mantenimiento",
+      "category": "maintenance",
+      "targetUser": "all",
+      "createdBy": "admin"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T07:48:28.137Z"
+  },
+  {
+    "action": "ALERT_CREATED",
+    "details": {
+      "alertId": "a41bbb956b700473b8855c4a12124ece",
+      "title": "awdawd",
+      "category": "update",
+      "targetUser": "all",
+      "createdBy": "admin"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T07:53:34.071Z"
+  },
+  {
+    "action": "ALERT_CREATED",
+    "details": {
+      "alertId": "ead7e88126ecbc24cd910a28f8a9c499",
+      "title": "vxvxcvxcvcxv",
+      "category": "reminder",
+      "targetUser": "fff",
+      "createdBy": "admin"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T07:58:01.913Z"
+  },
+  {
+    "action": "ALERT_CREATED",
+    "details": {
+      "alertId": "1e8e96c768c13ca45a1dd65fbb4cf818",
+      "title": "ererererr",
+      "category": "event",
+      "targetUser": "all",
+      "createdBy": "admin"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T07:58:31.389Z"
+  },
+  {
+    "action": "ALERT_CREATED",
+    "details": {
+      "alertId": "9f9bd6e0c007d8df3111d81e1ae01a46",
+      "title": "dddcdsdf",
+      "category": "maintenance",
+      "targetUser": "all",
+      "createdBy": "admin"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T08:07:14.042Z"
+  },
+  {
+    "action": "USER_CREATED",
+    "details": {
+      "username": "Nando",
+      "role": "user",
+      "createdBy": "admin"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T17:09:24.569Z"
   }
 ]

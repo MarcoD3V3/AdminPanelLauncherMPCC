@@ -456,9 +456,14 @@
             <div id="page-alerts" class="page">
                 <div class="page-header">
                     <h2>Alertas y Notificaciones</h2>
-                    <button class="btn btn-primary" onclick="showCreateAlertModal()">
-                        <i class="fas fa-plus"></i> Crear Alerta
-                    </button>
+                    <div class="page-actions">
+                        <button class="btn btn-warning" onclick="disableMaintenanceMode()" id="disable-maintenance-btn" style="display: none;">
+                            <i class="fas fa-tools"></i> Desactivar Mantenimiento
+                        </button>
+                        <button class="btn btn-primary" onclick="showCreateAlertModal()">
+                            <i class="fas fa-plus"></i> Crear Alerta
+                        </button>
+                    </div>
                 </div>
 
                 <div class="alerts-container" id="alerts-container"></div>
@@ -691,18 +696,36 @@
 
     <!-- Modal para crear alerta -->
     <div id="create-alert-modal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 600px;">
             <div class="modal-header">
-                <h2>Crear Alerta</h2>
+                <h2>Crear Notificación</h2>
                 <button class="close-btn" onclick="closeCreateAlertModal()">&times;</button>
             </div>
             <div class="modal-body">
+                <label>Categoría:</label>
+                <select id="alert-category" onchange="updateAlertFields()">
+                    <option value="alert">Alerta General</option>
+                    <option value="maintenance">Mantenimiento</option>
+                    <option value="update">Actualización del Launcher</option>
+                    <option value="event">Evento Especial</option>
+                    <option value="reward">Recompensa/Bonificación</option>
+                    <option value="restriction">Restricción/Suspensión</option>
+                    <option value="config">Configuración Dinámica</option>
+                    <option value="achievement">Logro/Progreso</option>
+                    <option value="promotion">Promoción/Oferta</option>
+                    <option value="reminder">Recordatorio</option>
+                    <option value="command">Comando Remoto</option>
+                </select>
+                
                 <label>Título:</label>
-                <input type="text" id="alert-title" placeholder="Título de la alerta">
+                <input type="text" id="alert-title" placeholder="Título de la notificación">
+                
                 <label>Mensaje:</label>
-                <textarea id="alert-message" rows="4" placeholder="Mensaje de la alerta"></textarea>
+                <textarea id="alert-message" rows="4" placeholder="Mensaje de la notificación"></textarea>
+                
                 <label>Usuario específico (opcional):</label>
                 <input type="text" id="alert-target-user" placeholder="Dejar vacío para todos los usuarios">
+                
                 <label>Tipo:</label>
                 <select id="alert-type">
                     <option value="info">Info</option>
@@ -710,8 +733,102 @@
                     <option value="warning">Advertencia</option>
                     <option value="error">Error</option>
                 </select>
+                
+                <label>Prioridad:</label>
+                <select id="alert-priority">
+                    <option value="low">Baja</option>
+                    <option value="normal" selected>Normal</option>
+                    <option value="high">Alta</option>
+                    <option value="urgent">Urgente</option>
+                </select>
+                
+                <!-- Campos dinámicos según categoría -->
+                <div id="alert-metadata-fields"></div>
+                
                 <div id="create-alert-error" class="error-message" style="display: none;"></div>
-                <button class="btn btn-primary" onclick="confirmCreateAlert()">Enviar Alerta</button>
+                <button class="btn btn-primary" onclick="confirmCreateAlert()">Enviar Notificación</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Detalles de Alerta -->
+    <div id="alert-details-modal" class="modal">
+        <div class="modal-content" style="max-width: 700px; max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header">
+                <h2><i class="fas fa-info-circle"></i> Detalles de la Notificación</h2>
+                <button class="close-btn" onclick="closeAlertDetailsModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="alert-details-grid">
+                    <div class="detail-item">
+                        <label><i class="fas fa-fingerprint"></i> ID:</label>
+                        <span id="alert-details-id">-</span>
+                    </div>
+                    
+                    <div class="detail-item full-width">
+                        <label><i class="fas fa-heading"></i> Título:</label>
+                        <span id="alert-details-title" class="detail-value-large">-</span>
+                    </div>
+                    
+                    <div class="detail-item full-width">
+                        <label><i class="fas fa-comment"></i> Mensaje:</label>
+                        <span id="alert-details-message" class="detail-value-large">-</span>
+                    </div>
+                    
+                    <div class="detail-item">
+                        <label><i class="fas fa-tag"></i> Categoría:</label>
+                        <span id="alert-details-category">-</span>
+                    </div>
+                    
+                    <div class="detail-item">
+                        <label><i class="fas fa-info-circle"></i> Tipo:</label>
+                        <span id="alert-details-type" class="detail-badge">-</span>
+                    </div>
+                    
+                    <div class="detail-item">
+                        <label><i class="fas fa-exclamation-circle"></i> Prioridad:</label>
+                        <span id="alert-details-priority" class="detail-badge">-</span>
+                    </div>
+                    
+                    <div class="detail-item">
+                        <label><i class="fas fa-user"></i> Usuario Objetivo:</label>
+                        <span id="alert-details-target">-</span>
+                    </div>
+                    
+                    <div class="detail-item">
+                        <label><i class="fas fa-calendar-plus"></i> Creada:</label>
+                        <span id="alert-details-created">-</span>
+                    </div>
+                    
+                    <div class="detail-item">
+                        <label><i class="fas fa-calendar-times"></i> Expira:</label>
+                        <span id="alert-details-expires">-</span>
+                    </div>
+                    
+                    <div class="detail-item">
+                        <label><i class="fas fa-check-circle"></i> Leída:</label>
+                        <span id="alert-details-read">-</span>
+                    </div>
+                    
+                    <div class="detail-item full-width">
+                        <label><i class="fas fa-users"></i> Leída por:</label>
+                        <span id="alert-details-readBy">-</span>
+                    </div>
+                    
+                    <div class="detail-item full-width">
+                        <label><i class="fas fa-code"></i> Metadata:</label>
+                        <div id="alert-details-metadata" class="metadata-display"></div>
+                    </div>
+                </div>
+                
+                <div class="modal-actions" style="margin-top: var(--spacing-lg);">
+                    <button class="btn btn-primary" onclick="closeAlertDetailsModal()">
+                        <i class="fas fa-times"></i> Cerrar
+                    </button>
+                    <button class="btn btn-danger" onclick="deleteAlert(document.getElementById('alert-details-id').textContent);">
+                        <i class="fas fa-trash"></i> Eliminar Alerta
+                    </button>
+                </div>
             </div>
         </div>
     </div>
