@@ -161,8 +161,21 @@ app.delete('/api/tokens/clear-used', async (req, res) => {
     }
 });
 
-// Servir archivos estáticos del panel
-app.use(express.static(__dirname));
+// Servir archivos estáticos del panel (React build en producción)
+if (process.env.NODE_ENV === 'production') {
+  // En producción, servir los archivos compilados de React
+  app.use(express.static(path.join(__dirname, 'build')));
+  
+  // Todas las rutas que no sean API, servir index.html (para React Router)
+  app.get('*', (req, res) => {
+    if (!req.path.startsWith('/api')) {
+      res.sendFile(path.join(__dirname, 'build', 'index.html'));
+    }
+  });
+} else {
+  // En desarrollo, servir archivos estáticos normales
+  app.use(express.static(__dirname));
+}
 
 // Iniciar servidor
 // Usar el puerto de la variable de entorno (para Railway, Render, Heroku, etc.)
@@ -170,7 +183,11 @@ const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
     console.log(`🚀 Servidor de administración corriendo en puerto ${PORT}`);
-    console.log(`📊 Panel de administración: http://localhost:${PORT}/index.html`);
+    if (process.env.NODE_ENV === 'production') {
+        console.log(`📊 Panel de administración (React): http://localhost:${PORT}/`);
+    } else {
+        console.log(`📊 Panel de administración: http://localhost:${PORT}/index.html`);
+    }
     console.log(`🔗 Endpoint de validación: http://localhost:${PORT}/api/validate-token`);
 });
 
