@@ -35,30 +35,122 @@
             <button class="btn btn-secondary" onclick="refreshTokens()">
                 🔄 Actualizar Lista
             </button>
+            <button class="btn btn-success" onclick="exportTokens()">
+                📥 Exportar Tokens
+            </button>
+            <button class="btn btn-info" onclick="showImportModal()">
+                📤 Importar Tokens
+            </button>
             <button class="btn btn-danger" onclick="clearUsedTokens()">
                 🗑️ Limpiar Tokens Usados
             </button>
         </div>
-
-        <div class="search-bar">
-            <input type="text" id="search-input" placeholder="Buscar token..." onkeyup="filterTokens()">
+        
+        <div class="tabs-container">
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab('tokens')" data-tab="tokens">
+                    🔑 Tokens
+                </button>
+                <button class="tab-btn" onclick="switchTab('history')" data-tab="history">
+                    📜 Historial
+                </button>
+                <button class="tab-btn" onclick="switchTab('stats')" data-tab="stats">
+                    📊 Estadísticas
+                </button>
+                <button class="tab-btn" onclick="switchTab('logs')" data-tab="logs">
+                    📋 Logs
+                </button>
+            </div>
         </div>
 
-        <div class="tokens-table-container">
-            <table class="tokens-table">
-                <thead>
-                    <tr>
-                        <th>Token</th>
-                        <th>Estado</th>
-                        <th>Fecha de Creación</th>
-                        <th>Fecha de Uso</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
-                <tbody id="tokens-tbody">
-                    <!-- Los tokens se cargarán aquí -->
-                </tbody>
-            </table>
+        <!-- Tab: Tokens -->
+        <div id="tab-tokens" class="tab-content active">
+            <div class="search-bar">
+                <input type="text" id="search-input" placeholder="Buscar token..." onkeyup="filterTokens()">
+                <select id="filter-status" onchange="filterTokens()">
+                    <option value="">Todos los estados</option>
+                    <option value="available">Disponibles</option>
+                    <option value="used">Usados</option>
+                </select>
+            </div>
+
+            <div class="tokens-table-container">
+                <table class="tokens-table">
+                    <thead>
+                        <tr>
+                            <th onclick="sortTokens('token')">Token ↕️</th>
+                            <th onclick="sortTokens('status')">Estado ↕️</th>
+                            <th onclick="sortTokens('createdAt')">Fecha de Creación ↕️</th>
+                            <th onclick="sortTokens('usedAt')">Fecha de Uso ↕️</th>
+                            <th>IP de Uso</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tokens-tbody">
+                        <!-- Los tokens se cargarán aquí -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="pagination" id="pagination">
+                <!-- Paginación se generará aquí -->
+            </div>
+        </div>
+
+        <!-- Tab: Historial -->
+        <div id="tab-history" class="tab-content">
+            <div class="history-filters">
+                <input type="text" id="history-search" placeholder="Buscar por token o IP..." onkeyup="loadHistory()">
+                <select id="history-success-filter" onchange="loadHistory()">
+                    <option value="">Todos</option>
+                    <option value="true">Exitosos</option>
+                    <option value="false">Fallidos</option>
+                </select>
+            </div>
+            <div class="history-table-container">
+                <table class="tokens-table">
+                    <thead>
+                        <tr>
+                            <th>Token</th>
+                            <th>IP</th>
+                            <th>Estado</th>
+                            <th>Fecha/Hora</th>
+                            <th>Error</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-tbody">
+                        <!-- El historial se cargará aquí -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tab: Estadísticas -->
+        <div id="tab-stats" class="tab-content">
+            <div class="stats-grid" id="stats-grid">
+                <!-- Las estadísticas se cargarán aquí -->
+            </div>
+            <div class="charts-container" id="charts-container">
+                <!-- Los gráficos se cargarán aquí -->
+            </div>
+        </div>
+
+        <!-- Tab: Logs -->
+        <div id="tab-logs" class="tab-content">
+            <div class="logs-filters">
+                <select id="logs-action-filter" onchange="loadLogs()">
+                    <option value="">Todas las acciones</option>
+                    <option value="TOKEN_GENERATED">Generación de tokens</option>
+                    <option value="TOKEN_DELETED">Eliminación de tokens</option>
+                    <option value="TOKENS_CLEARED">Limpieza de tokens</option>
+                    <option value="TOKENS_EXPORTED">Exportación</option>
+                    <option value="TOKENS_IMPORTED">Importación</option>
+                    <option value="CONFIG_UPDATED">Cambios de configuración</option>
+                </select>
+            </div>
+            <div class="logs-container" id="logs-container">
+                <!-- Los logs se cargarán aquí -->
+            </div>
         </div>
 
         <div id="notification" class="notification"></div>
@@ -75,6 +167,24 @@
                 <label>Cantidad de tokens a generar:</label>
                 <input type="number" id="token-count" min="1" max="100" value="1">
                 <button class="btn btn-primary" onclick="confirmGenerate()">Generar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para importar tokens -->
+    <div id="import-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Importar Tokens</h2>
+                <button class="close-btn" onclick="closeImportModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <label>Pega los tokens (uno por línea o JSON array):</label>
+                <textarea id="import-tokens-text" rows="10" placeholder='Ejemplo:&#10;TOKEN1&#10;TOKEN2&#10;TOKEN3&#10;&#10;O formato JSON:&#10;[{"token": "TOKEN1", "used": false}, ...]'></textarea>
+                <div id="import-preview" style="display: none; margin-top: 10px; padding: 10px; background: #f0f0f0; border-radius: 5px;">
+                    <strong>Vista previa:</strong> <span id="import-count">0</span> tokens detectados
+                </div>
+                <button class="btn btn-primary" onclick="confirmImport()">Importar</button>
             </div>
         </div>
     </div>

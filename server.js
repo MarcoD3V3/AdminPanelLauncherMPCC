@@ -3,13 +3,35 @@ const cors = require('cors');
 const crypto = require('crypto');
 const fs = require('fs').promises;
 const path = require('path');
+const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
 
 const app = express();
 const TOKENS_FILE = path.join(__dirname, 'tokens.json');
+const HISTORY_FILE = path.join(__dirname, 'validation_history.json');
+const LOGS_FILE = path.join(__dirname, 'activity_logs.json');
+const CONFIG_FILE = path.join(__dirname, 'config.json');
 
-// Middleware
+// Middleware de seguridad
+app.use(helmet({
+    contentSecurityPolicy: false // Permitir scripts inline para el panel
+}));
 app.use(cors());
 app.use(express.json());
+
+// Rate limiting para validación de tokens (más permisivo para el launcher)
+const validateLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minuto
+    max: 100, // 100 peticiones por minuto
+    message: 'Demasiadas peticiones, intenta más tarde'
+});
+
+// Rate limiting para API del panel (más restrictivo)
+const apiLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minuto
+    max: 30, // 30 peticiones por minuto
+    message: 'Demasiadas peticiones, intenta más tarde'
+});
 
 // Cargar tokens desde archivo
 async function loadTokens() {
@@ -28,6 +50,110 @@ async function saveTokens(tokens) {
     await fs.writeFile(TOKENS_FILE, JSON.stringify(tokens, null, 2));
 }
 
+// Cargar historial de validaciones
+async function loadHistory() {
+    try {
+        const data = await fs.readFile(HISTORY_FILE, 'utf-8');
+        return JSON.parse(data);
+    } catch (error) {
+        await saveHistory([]);
+        return [];
+    }
+}
+
+// Guardar historial de validaciones
+async function saveHistory(history) {
+    await fs.writeFile(HISTORY_FILE, JSON.stringify(history, null, 2));
+}
+
+// Agregar entrada al historial
+async function addToHistory(token, ip, userAgent, success, error = null) {
+    try {
+        const history = await loadHistory();
+        history.push({
+            token: token,
+            ip: ip,
+            userAgent: userAgent || 'Unknown',
+            success: success,
+            error: error,
+            timestamp: new Date().toISOString()
+        });
+        // Mantener solo los últimos 1000 registros
+        if (history.length > 1000) {
+            history.splice(0, history.length - 1000);
+        }
+        await saveHistory(history);
+    } catch (error) {
+        console.error('Error al guardar historial:', error);
+    }
+}
+
+// Cargar logs de actividad
+async function loadLogs() {
+    try {
+        const data = await fs.readFile(LOGS_FILE, 'utf-8');
+        return JSON.parse(data);
+    } catch (error) {
+        await saveLogs([]);
+        return [];
+    }
+}
+
+// Guardar logs de actividad
+async function saveLogs(logs) {
+    await fs.writeFile(LOGS_FILE, JSON.stringify(logs, null, 2));
+}
+
+// Agregar log de actividad
+async function addLog(action, details, ip = null) {
+    try {
+        const logs = await loadLogs();
+        logs.push({
+            action: action,
+            details: details,
+            ip: ip,
+            timestamp: new Date().toISOString()
+        });
+        // Mantener solo los últimos 500 logs
+        if (logs.length > 500) {
+            logs.splice(0, logs.length - 500);
+        }
+        await saveLogs(logs);
+    } catch (error) {
+        console.error('Error al guardar log:', error);
+    }
+}
+
+// Cargar configuración
+async function loadConfig() {
+    try {
+        const data = await fs.readFile(CONFIG_FILE, 'utf-8');
+        return JSON.parse(data);
+    } catch (error) {
+        const defaultConfig = {
+            maxTokens: 10000,
+            rateLimitEnabled: true,
+            notificationsEnabled: false
+        };
+        await saveConfig(defaultConfig);
+        return defaultConfig;
+    }
+}
+
+// Guardar configuración
+async function saveConfig(config) {
+    await fs.writeFile(CONFIG_FILE, JSON.stringify(config, null, 2));
+}
+
+// Obtener IP del cliente
+function getClientIp(req) {
+    return req.headers['x-forwarded-for']?.split(',')[0] || 
+           req.headers['x-real-ip'] || 
+           req.connection.remoteAddress || 
+           req.socket.remoteAddress ||
+           'Unknown';
+}
+
 // Generar token único
 function generateToken() {
     return crypto.randomBytes(32).toString('hex').toUpperCase();
@@ -36,7 +162,7 @@ function generateToken() {
 // ==================== RUTAS ====================
 
 // Obtener todos los tokens
-app.get('/api/tokens', async (req, res) => {
+app.get('/api/tokens', apiLimiter, async (req, res) => {
     try {
         const tokens = await loadTokens();
         res.json(tokens);
@@ -46,10 +172,23 @@ app.get('/api/tokens', async (req, res) => {
 });
 
 // Generar nuevos tokens
-app.post('/api/tokens/generate', async (req, res) => {
+app.post('/api/tokens/generate', apiLimiter, async (req, res) => {
     try {
         const { count = 1 } = req.body;
+        const ip = getClientIp(req);
+        const config = await loadConfig();
+        
+        // Validar límite
+        if (count > 100) {
+            return res.status(400).json({ error: 'No se pueden generar más de 100 tokens a la vez' });
+        }
+        
         const tokens = await loadTokens();
+        if (tokens.length + count > config.maxTokens) {
+            return res.status(400).json({ 
+                error: `Límite de tokens alcanzado. Máximo: ${config.maxTokens}` 
+            });
+        }
         
         const newTokens = [];
         for (let i = 0; i < count; i++) {
@@ -58,12 +197,16 @@ app.post('/api/tokens/generate', async (req, res) => {
                 token: token,
                 used: false,
                 createdAt: new Date().toISOString(),
-                usedAt: null
+                usedAt: null,
+                createdBy: ip
             });
         }
         
         tokens.push(...newTokens);
         await saveTokens(tokens);
+        
+        // Registrar en logs
+        await addLog('TOKEN_GENERATED', { count, tokens: newTokens.map(t => t.token) }, ip);
         
         res.json({ 
             success: true, 
@@ -76,11 +219,14 @@ app.post('/api/tokens/generate', async (req, res) => {
 });
 
 // Validar token (usado por el launcher)
-app.post('/api/validate-token', async (req, res) => {
+app.post('/api/validate-token', validateLimiter, async (req, res) => {
     try {
         const { token } = req.body;
+        const ip = getClientIp(req);
+        const userAgent = req.headers['user-agent'] || 'Unknown';
         
         if (!token) {
+            await addToHistory(token, ip, userAgent, false, 'Token no proporcionado');
             return res.status(400).json({
                 valid: false,
                 success: false,
@@ -92,6 +238,7 @@ app.post('/api/validate-token', async (req, res) => {
         const tokenRecord = tokens.find(t => t.token === token);
         
         if (!tokenRecord) {
+            await addToHistory(token, ip, userAgent, false, 'Token no encontrado');
             return res.status(400).json({
                 valid: false,
                 success: false,
@@ -100,6 +247,7 @@ app.post('/api/validate-token', async (req, res) => {
         }
         
         if (tokenRecord.used) {
+            await addToHistory(token, ip, userAgent, false, 'Token ya ha sido usado');
             return res.status(400).json({
                 valid: false,
                 success: false,
@@ -110,7 +258,11 @@ app.post('/api/validate-token', async (req, res) => {
         // Marcar como usado
         tokenRecord.used = true;
         tokenRecord.usedAt = new Date().toISOString();
+        tokenRecord.usedFromIp = ip;
         await saveTokens(tokens);
+        
+        // Registrar en historial
+        await addToHistory(token, ip, userAgent, true);
         
         res.json({
             valid: true,
@@ -118,6 +270,9 @@ app.post('/api/validate-token', async (req, res) => {
             message: 'Token válido'
         });
     } catch (error) {
+        const ip = getClientIp(req);
+        const userAgent = req.headers['user-agent'] || 'Unknown';
+        await addToHistory(req.body.token, ip, userAgent, false, error.message);
         res.status(500).json({
             valid: false,
             success: false,
@@ -127,9 +282,10 @@ app.post('/api/validate-token', async (req, res) => {
 });
 
 // Eliminar un token
-app.delete('/api/tokens/:token', async (req, res) => {
+app.delete('/api/tokens/:token', apiLimiter, async (req, res) => {
     try {
         const { token } = req.params;
+        const ip = getClientIp(req);
         const tokens = await loadTokens();
         const filtered = tokens.filter(t => t.token !== token);
         
@@ -138,6 +294,10 @@ app.delete('/api/tokens/:token', async (req, res) => {
         }
         
         await saveTokens(filtered);
+        
+        // Registrar en logs
+        await addLog('TOKEN_DELETED', { token }, ip);
+        
         res.json({ success: true, message: 'Token eliminado exitosamente' });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -145,37 +305,259 @@ app.delete('/api/tokens/:token', async (req, res) => {
 });
 
 // Limpiar tokens usados
-app.delete('/api/tokens/clear-used', async (req, res) => {
+app.delete('/api/tokens/clear-used', apiLimiter, async (req, res) => {
     try {
+        const ip = getClientIp(req);
         const tokens = await loadTokens();
         const available = tokens.filter(t => !t.used);
+        const deletedCount = tokens.length - available.length;
+        
         await saveTokens(available);
+        
+        // Registrar en logs
+        await addLog('TOKENS_CLEARED', { deleted: deletedCount }, ip);
         
         res.json({ 
             success: true, 
             message: 'Tokens usados eliminados exitosamente',
-            deleted: tokens.length - available.length
+            deleted: deletedCount
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// Servir archivos estáticos del panel (React build en producción)
-if (process.env.NODE_ENV === 'production') {
-  // En producción, servir los archivos compilados de React
-  app.use(express.static(path.join(__dirname, 'build')));
-  
-  // Todas las rutas que no sean API, servir index.html (para React Router)
-  app.get('*', (req, res) => {
-    if (!req.path.startsWith('/api')) {
-      res.sendFile(path.join(__dirname, 'build', 'index.html'));
+// ==================== NUEVOS ENDPOINTS ====================
+
+// Obtener estadísticas
+app.get('/api/stats', apiLimiter, async (req, res) => {
+    try {
+        const tokens = await loadTokens();
+        const history = await loadHistory();
+        
+        const total = tokens.length;
+        const used = tokens.filter(t => t.used).length;
+        const available = total - used;
+        
+        // Estadísticas de los últimos 7 días
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        
+        const recentHistory = history.filter(h => 
+            new Date(h.timestamp) >= sevenDaysAgo
+        );
+        
+        const validationsToday = history.filter(h => {
+            const today = new Date();
+            const histDate = new Date(h.timestamp);
+            return histDate.toDateString() === today.toDateString();
+        }).length;
+        
+        const validationsThisWeek = recentHistory.length;
+        const successfulValidations = recentHistory.filter(h => h.success).length;
+        const failedValidations = recentHistory.filter(h => !h.success).length;
+        
+        // Tokens generados hoy
+        const tokensToday = tokens.filter(t => {
+            const today = new Date();
+            const tokenDate = new Date(t.createdAt);
+            return tokenDate.toDateString() === today.toDateString();
+        }).length;
+        
+        res.json({
+            tokens: {
+                total,
+                used,
+                available,
+                usedPercentage: total > 0 ? ((used / total) * 100).toFixed(2) : 0
+            },
+            validations: {
+                today: validationsToday,
+                thisWeek: validationsThisWeek,
+                successful: successfulValidations,
+                failed: failedValidations,
+                successRate: validationsThisWeek > 0 
+                    ? ((successfulValidations / validationsThisWeek) * 100).toFixed(2) 
+                    : 0
+            },
+            activity: {
+                tokensGeneratedToday: tokensToday
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
-  });
-} else {
-  // En desarrollo, servir archivos estáticos normales
-  app.use(express.static(__dirname));
-}
+});
+
+// Obtener historial de validaciones
+app.get('/api/history', apiLimiter, async (req, res) => {
+    try {
+        const { limit = 100, offset = 0, token, success } = req.query;
+        let history = await loadHistory();
+        
+        // Filtros
+        if (token) {
+            history = history.filter(h => h.token.includes(token));
+        }
+        if (success !== undefined) {
+            history = history.filter(h => h.success === (success === 'true'));
+        }
+        
+        // Ordenar por fecha (más reciente primero)
+        history.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        
+        // Paginación
+        const total = history.length;
+        const paginated = history.slice(parseInt(offset), parseInt(offset) + parseInt(limit));
+        
+        res.json({
+            history: paginated,
+            total,
+            limit: parseInt(limit),
+            offset: parseInt(offset)
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Exportar tokens
+app.get('/api/tokens/export', apiLimiter, async (req, res) => {
+    try {
+        const { format = 'json' } = req.query;
+        const tokens = await loadTokens();
+        
+        if (format === 'csv') {
+            // Generar CSV
+            const csvHeader = 'Token,Estado,Fecha Creación,Fecha Uso,IP de Uso\n';
+            const csvRows = tokens.map(t => {
+                const token = t.token;
+                const estado = t.used ? 'Usado' : 'Disponible';
+                const fechaCreacion = t.createdAt || '';
+                const fechaUso = t.usedAt || '';
+                const ipUso = t.usedFromIp || '';
+                return `${token},${estado},${fechaCreacion},${fechaUso},${ipUso}`;
+            }).join('\n');
+            
+            res.setHeader('Content-Type', 'text/csv');
+            res.setHeader('Content-Disposition', 'attachment; filename=tokens.csv');
+            res.send(csvHeader + csvRows);
+        } else {
+            // JSON por defecto
+            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Content-Disposition', 'attachment; filename=tokens.json');
+            res.json(tokens);
+        }
+        
+        await addLog('TOKENS_EXPORTED', { format, count: tokens.length }, getClientIp(req));
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Importar tokens
+app.post('/api/tokens/import', apiLimiter, async (req, res) => {
+    try {
+        const { tokens: tokensToImport } = req.body;
+        const ip = getClientIp(req);
+        
+        if (!Array.isArray(tokensToImport)) {
+            return res.status(400).json({ error: 'Los tokens deben ser un array' });
+        }
+        
+        const existingTokens = await loadTokens();
+        const newTokens = [];
+        const skipped = [];
+        
+        for (const tokenData of tokensToImport) {
+            const token = typeof tokenData === 'string' ? tokenData : tokenData.token;
+            
+            // Verificar que no exista
+            if (existingTokens.find(t => t.token === token)) {
+                skipped.push(token);
+                continue;
+            }
+            
+            newTokens.push({
+                token: token,
+                used: typeof tokenData === 'object' ? (tokenData.used || false) : false,
+                createdAt: typeof tokenData === 'object' ? (tokenData.createdAt || new Date().toISOString()) : new Date().toISOString(),
+                usedAt: typeof tokenData === 'object' ? (tokenData.usedAt || null) : null,
+                createdBy: ip
+            });
+        }
+        
+        existingTokens.push(...newTokens);
+        await saveTokens(existingTokens);
+        
+        await addLog('TOKENS_IMPORTED', { 
+            imported: newTokens.length, 
+            skipped: skipped.length 
+        }, ip);
+        
+        res.json({
+            success: true,
+            imported: newTokens.length,
+            skipped: skipped.length,
+            skippedTokens: skipped
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Obtener logs de actividad
+app.get('/api/logs', apiLimiter, async (req, res) => {
+    try {
+        const { limit = 100, action } = req.query;
+        let logs = await loadLogs();
+        
+        if (action) {
+            logs = logs.filter(l => l.action === action);
+        }
+        
+        // Ordenar por fecha (más reciente primero)
+        logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        
+        // Limitar
+        logs = logs.slice(0, parseInt(limit));
+        
+        res.json(logs);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Obtener configuración
+app.get('/api/config', apiLimiter, async (req, res) => {
+    try {
+        const config = await loadConfig();
+        res.json(config);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Actualizar configuración
+app.put('/api/config', apiLimiter, async (req, res) => {
+    try {
+        const ip = getClientIp(req);
+        const newConfig = req.body;
+        const currentConfig = await loadConfig();
+        
+        const updatedConfig = { ...currentConfig, ...newConfig };
+        await saveConfig(updatedConfig);
+        
+        await addLog('CONFIG_UPDATED', { changes: newConfig }, ip);
+        
+        res.json({ success: true, config: updatedConfig });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Servir archivos estáticos del panel
+app.use(express.static(__dirname));
 
 // Iniciar servidor
 // Usar el puerto de la variable de entorno (para Railway, Render, Heroku, etc.)
@@ -183,11 +565,7 @@ const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
     console.log(`🚀 Servidor de administración corriendo en puerto ${PORT}`);
-    if (process.env.NODE_ENV === 'production') {
-        console.log(`📊 Panel de administración (React): http://localhost:${PORT}/`);
-    } else {
-        console.log(`📊 Panel de administración: http://localhost:${PORT}/index.html`);
-    }
+    console.log(`📊 Panel de administración: http://localhost:${PORT}/index.html`);
     console.log(`🔗 Endpoint de validación: http://localhost:${PORT}/api/validate-token`);
 });
 
