@@ -50,6 +50,10 @@ function loadOrCreateJWTSecret() {
 
 const JWT_SECRET = loadOrCreateJWTSecret();
 
+// Configurar Express para confiar en proxies (necesario para Railway, Heroku, etc.)
+// Esto permite que express-rate-limit identifique correctamente las IPs reales
+app.set('trust proxy', true);
+
 // Middleware de seguridad
 app.use(helmet({
     contentSecurityPolicy: false // Permitir scripts inline para el panel
@@ -71,37 +75,76 @@ const apiLimiter = rateLimit({
     message: 'Demasiadas peticiones, intenta más tarde'
 });
 
-// Cargar tokens desde archivo
-async function loadTokens() {
+// Función helper para cargar archivos JSON de forma segura
+async function safeLoadJSON(filePath, defaultValue = [], saveFunction = null) {
     try {
-        const data = await fs.readFile(TOKENS_FILE, 'utf-8');
-        return JSON.parse(data);
+        const data = await fs.readFile(filePath, 'utf-8');
+        if (!data || data.trim() === '') {
+            return defaultValue;
+        }
+        const parsed = JSON.parse(data);
+        // Si el valor por defecto es un array, asegurar que el resultado también lo sea
+        if (Array.isArray(defaultValue)) {
+            return Array.isArray(parsed) ? parsed : defaultValue;
+        }
+        return parsed || defaultValue;
     } catch (error) {
-        // Si el archivo no existe, crear uno vacío
-        await saveTokens([]);
-        return [];
+        if (error.code === 'ENOENT') {
+            // Archivo no existe, crear uno con valores por defecto
+            if (saveFunction) {
+                await saveFunction(defaultValue);
+            }
+        } else {
+            console.error(`⚠️ Error al cargar ${path.basename(filePath)} (archivo corrupto?), creando nuevo:`, error.message);
+            // Archivo corrupto, hacer backup y crear uno nuevo
+            try {
+                await fs.rename(filePath, filePath + '.backup.' + Date.now());
+            } catch (e) {
+                // Ignorar si no se puede renombrar
+            }
+            if (saveFunction) {
+                await saveFunction(defaultValue);
+            }
+        }
+        return defaultValue;
     }
 }
 
-// Guardar tokens en archivo
+// Cargar tokens desde archivo
+async function loadTokens() {
+    return await safeLoadJSON(TOKENS_FILE, [], saveTokens);
+}
+
+// Guardar tokens en archivo (con manejo de errores robusto)
 async function saveTokens(tokens) {
-    await fs.writeFile(TOKENS_FILE, JSON.stringify(tokens, null, 2));
+    try {
+        const data = JSON.stringify(tokens, null, 2);
+        await fs.writeFile(TOKENS_FILE, data, 'utf-8');
+        // Verificar que se guardó correctamente
+        const verify = await fs.readFile(TOKENS_FILE, 'utf-8');
+        if (!verify) {
+            throw new Error('Error al verificar guardado de tokens');
+        }
+    } catch (error) {
+        console.error('❌ Error crítico al guardar tokens:', error);
+        throw error; // Re-lanzar para que el llamador sepa que falló
+    }
 }
 
 // Cargar historial de validaciones
 async function loadHistory() {
-    try {
-        const data = await fs.readFile(HISTORY_FILE, 'utf-8');
-        return JSON.parse(data);
-    } catch (error) {
-        await saveHistory([]);
-        return [];
-    }
+    return await safeLoadJSON(HISTORY_FILE, [], saveHistory);
 }
 
-// Guardar historial de validaciones
+// Guardar historial de validaciones (con manejo de errores robusto)
 async function saveHistory(history) {
-    await fs.writeFile(HISTORY_FILE, JSON.stringify(history, null, 2));
+    try {
+        const data = JSON.stringify(history, null, 2);
+        await fs.writeFile(HISTORY_FILE, data, 'utf-8');
+    } catch (error) {
+        console.error('❌ Error crítico al guardar historial:', error);
+        throw error;
+    }
 }
 
 // Agregar entrada al historial
@@ -129,18 +172,18 @@ async function addToHistory(token, ip, userAgent, success, error = null, usernam
 
 // Cargar logs de actividad
 async function loadLogs() {
-    try {
-        const data = await fs.readFile(LOGS_FILE, 'utf-8');
-        return JSON.parse(data);
-    } catch (error) {
-        await saveLogs([]);
-        return [];
-    }
+    return await safeLoadJSON(LOGS_FILE, [], saveLogs);
 }
 
-// Guardar logs de actividad
+// Guardar logs de actividad (con manejo de errores robusto)
 async function saveLogs(logs) {
-    await fs.writeFile(LOGS_FILE, JSON.stringify(logs, null, 2));
+    try {
+        const data = JSON.stringify(logs, null, 2);
+        await fs.writeFile(LOGS_FILE, data, 'utf-8');
+    } catch (error) {
+        console.error('❌ Error crítico al guardar logs:', error);
+        throw error;
+    }
 }
 
 // Agregar log de actividad
@@ -167,25 +210,25 @@ async function addLog(action, details, ip = null) {
 
 // Cargar sesiones
 async function loadSessions() {
-    try {
-        const data = await fs.readFile(SESSIONS_FILE, 'utf-8');
-        return JSON.parse(data);
-    } catch (error) {
-        await saveSessions([]);
-        return [];
-    }
+    return await safeLoadJSON(SESSIONS_FILE, [], saveSessions);
 }
 
-// Guardar sesiones
+// Guardar sesiones (con manejo de errores robusto)
 async function saveSessions(sessions) {
-    await fs.writeFile(SESSIONS_FILE, JSON.stringify(sessions, null, 2));
-    // Actualizar mapa en memoria
-    activeSessions.clear();
-    sessions.forEach(session => {
-        if (session.active) {
-            activeSessions.set(session.token, session);
-        }
-    });
+    try {
+        const data = JSON.stringify(sessions, null, 2);
+        await fs.writeFile(SESSIONS_FILE, data, 'utf-8');
+        // Actualizar mapa en memoria
+        activeSessions.clear();
+        sessions.forEach(session => {
+            if (session.active) {
+                activeSessions.set(session.token, session);
+            }
+        });
+    } catch (error) {
+        console.error('❌ Error crítico al guardar sesiones:', error);
+        throw error;
+    }
 }
 
 // Crear o actualizar sesión
@@ -320,18 +363,18 @@ async function updateSessionActivity(token) {
 
 // Cargar alertas
 async function loadAlerts() {
-    try {
-        const data = await fs.readFile(ALERTS_FILE, 'utf-8');
-        return JSON.parse(data);
-    } catch (error) {
-        await saveAlerts([]);
-        return [];
-    }
+    return await safeLoadJSON(ALERTS_FILE, [], saveAlerts);
 }
 
-// Guardar alertas
+// Guardar alertas (con manejo de errores robusto)
 async function saveAlerts(alerts) {
-    await fs.writeFile(ALERTS_FILE, JSON.stringify(alerts, null, 2));
+    try {
+        const data = JSON.stringify(alerts, null, 2);
+        await fs.writeFile(ALERTS_FILE, data, 'utf-8');
+    } catch (error) {
+        console.error('❌ Error crítico al guardar alertas:', error);
+        throw error;
+    }
 }
 
 // Crear alerta
@@ -378,23 +421,23 @@ async function getUserAlerts(username) {
 
 // Cargar configuración
 async function loadConfig() {
-    try {
-        const data = await fs.readFile(CONFIG_FILE, 'utf-8');
-        return JSON.parse(data);
-    } catch (error) {
-        const defaultConfig = {
-            maxTokens: 10000,
-            rateLimitEnabled: true,
-            notificationsEnabled: false
-        };
-        await saveConfig(defaultConfig);
-        return defaultConfig;
-    }
+    const defaultConfig = {
+        maxTokens: 10000,
+        rateLimitEnabled: true,
+        notificationsEnabled: false
+    };
+    return await safeLoadJSON(CONFIG_FILE, defaultConfig, saveConfig);
 }
 
-// Guardar configuración
+// Guardar configuración (con manejo de errores robusto)
 async function saveConfig(config) {
-    await fs.writeFile(CONFIG_FILE, JSON.stringify(config, null, 2));
+    try {
+        const data = JSON.stringify(config, null, 2);
+        await fs.writeFile(CONFIG_FILE, data, 'utf-8');
+    } catch (error) {
+        console.error('❌ Error crítico al guardar configuración:', error);
+        throw error;
+    }
 }
 
 // Obtener IP del cliente
@@ -417,24 +460,50 @@ function generateToken() {
 async function loadUsers() {
     try {
         const data = await fs.readFile(USERS_FILE, 'utf-8');
-        return JSON.parse(data);
+        if (!data || data.trim() === '') {
+            throw new Error('Archivo vacío');
+        }
+        const parsed = JSON.parse(data);
+        if (!Array.isArray(parsed) || parsed.length === 0) {
+            throw new Error('Array vacío o inválido');
+        }
+        return parsed;
     } catch (error) {
-        // Si no existe, crear usuario por defecto
-        const defaultUsers = [{
-            username: 'admin',
-            password: await bcrypt.hash('admin123', 10), // Contraseña por defecto
-            createdAt: new Date().toISOString(),
-            role: 'admin'
-        }];
-        await saveUsers(defaultUsers);
-        console.log('⚠️ Usuario por defecto creado: admin / admin123');
-        return defaultUsers;
+        // Si no existe o está corrupto, crear usuario por defecto
+        if (error.code === 'ENOENT' || error.message.includes('corrupto') || error.message.includes('vacío') || error.message.includes('inválido')) {
+            if (error.code !== 'ENOENT') {
+                console.error('⚠️ Error al cargar usuarios (archivo corrupto?), creando nuevo:', error.message);
+                // Hacer backup del archivo corrupto
+                try {
+                    await fs.rename(USERS_FILE, USERS_FILE + '.backup.' + Date.now());
+                } catch (e) {
+                    // Ignorar si no se puede renombrar
+                }
+            }
+            // Crear usuario por defecto
+            const defaultUsers = [{
+                username: 'admin',
+                password: await bcrypt.hash('admin123', 10), // Contraseña por defecto
+                createdAt: new Date().toISOString(),
+                role: 'admin'
+            }];
+            await saveUsers(defaultUsers);
+            console.log('⚠️ Usuario por defecto creado: admin / admin123');
+            return defaultUsers;
+        }
+        throw error; // Re-lanzar otros errores
     }
 }
 
-// Guardar usuarios
+// Guardar usuarios (con manejo de errores robusto)
 async function saveUsers(users) {
-    await fs.writeFile(USERS_FILE, JSON.stringify(users, null, 2));
+    try {
+        const data = JSON.stringify(users, null, 2);
+        await fs.writeFile(USERS_FILE, data, 'utf-8');
+    } catch (error) {
+        console.error('❌ Error crítico al guardar usuarios:', error);
+        throw error;
+    }
 }
 
 // Verificar credenciales
@@ -1296,6 +1365,48 @@ app.delete('/api/alerts/:alertId', authenticateToken, apiLimiter, async (req, re
     }
 });
 
+// ==================== INICIALIZACIÓN DEL SERVIDOR ====================
+
+// Función para inicializar y cargar todos los datos al inicio
+async function initializeServer() {
+    try {
+        console.log('📦 Inicializando servidor y cargando datos...');
+        
+        // Cargar todos los datos para verificar que los archivos existen
+        const tokens = await loadTokens();
+        const history = await loadHistory();
+        const logs = await loadLogs();
+        const sessions = await loadSessions();
+        const alerts = await loadAlerts();
+        const config = await loadConfig();
+        const users = await loadUsers();
+        
+        // Mostrar estadísticas de datos cargados
+        console.log(`✅ Tokens cargados: ${tokens.length}`);
+        console.log(`✅ Historial cargado: ${history.length} registros`);
+        console.log(`✅ Logs cargados: ${logs.length} entradas`);
+        console.log(`✅ Sesiones cargadas: ${sessions.length} (${sessions.filter(s => s.active).length} activas)`);
+        console.log(`✅ Alertas cargadas: ${alerts.length}`);
+        console.log(`✅ Usuarios cargados: ${users.length}`);
+        console.log(`✅ Configuración cargada`);
+        
+        // Cargar sesiones activas en memoria
+        sessions.forEach(session => {
+            if (session.active) {
+                activeSessions.set(session.token, session);
+            }
+        });
+        
+        console.log('✅ Todos los datos han sido cargados correctamente');
+        console.log('💾 Los datos se guardan automáticamente en cada operación');
+        
+    } catch (error) {
+        console.error('❌ Error al inicializar servidor:', error);
+        // No lanzar el error, permitir que el servidor inicie de todas formas
+        // pero con datos vacíos
+    }
+}
+
 // Servir archivos estáticos del panel
 app.use(express.static(__dirname));
 
@@ -1303,9 +1414,20 @@ app.use(express.static(__dirname));
 // Usar el puerto de la variable de entorno (para Railway, Render, Heroku, etc.)
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
-    console.log(`🚀 Servidor de administración corriendo en puerto ${PORT}`);
-    console.log(`📊 Panel de administración: http://localhost:${PORT}/index.html`);
-    console.log(`🔗 Endpoint de validación: http://localhost:${PORT}/api/validate-token`);
+// Inicializar datos antes de iniciar el servidor
+initializeServer().then(() => {
+    app.listen(PORT, () => {
+        console.log(`🚀 Servidor de administración corriendo en puerto ${PORT}`);
+        console.log(`📊 Panel de administración: http://localhost:${PORT}/index.html`);
+        console.log(`🔗 Endpoint de validación: http://localhost:${PORT}/api/validate-token`);
+        console.log('💾 Sistema de persistencia activo - Todos los cambios se guardan automáticamente');
+    });
+}).catch(error => {
+    console.error('❌ Error crítico al inicializar:', error);
+    // Iniciar servidor de todas formas
+    app.listen(PORT, () => {
+        console.log(`🚀 Servidor de administración corriendo en puerto ${PORT} (con advertencias)`);
+        console.log(`📊 Panel de administración: http://localhost:${PORT}/index.html`);
+    });
 });
 
