@@ -74,8 +74,37 @@ app.set('trust proxy', true);
 app.use(helmet({
     contentSecurityPolicy: false // Permitir scripts inline para el panel
 }));
-app.use(cors());
-app.use(express.json());
+
+// Configuración CORS mejorada para compatibilidad con Python/httpx
+app.use(cors({
+    origin: '*', // Permitir todos los orígenes (ajustar en producción si es necesario)
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'User-Agent'],
+    credentials: true,
+    maxAge: 86400 // Cache preflight por 24 horas
+}));
+
+// Middleware para manejar preflight requests
+app.options('*', cors());
+
+app.use(express.json({
+    limit: '10mb', // Aumentar límite para tokens grandes
+    strict: true // Solo aceptar arrays y objetos JSON
+}));
+
+// Middleware para logging de requests (útil para debugging con Python)
+app.use((req, res, next) => {
+    if (process.env.NODE_ENV === 'development') {
+        console.log(`📥 ${req.method} ${req.path}`, {
+            headers: {
+                'user-agent': req.headers['user-agent'],
+                'authorization': req.headers['authorization'] ? 'Bearer ***' : 'none'
+            },
+            body: req.method !== 'GET' ? (req.body?.token ? { ...req.body, token: '***' } : req.body) : undefined
+        });
+    }
+    next();
+});
 
 // Rate limiting para validación de tokens (más permisivo para el launcher)
 const validateLimiter = rateLimit({
@@ -762,25 +791,35 @@ function optionalAuth(req, res, next) {
 
 // ==================== RUTAS DE AUTENTICACIÓN ====================
 
-// Login (para panel y launcher)
+// Login (para panel y launcher Python)
 app.post('/api/auth/login', apiLimiter, async (req, res) => {
     try {
         const { username, password } = req.body;
         const ip = getClientIp(req);
+        const userAgent = req.headers['user-agent'] || 'Unknown';
         
         // Limpiar espacios en blanco
         const cleanUsername = (username || '').trim();
         const cleanPassword = (password || '').trim();
         
         if (!cleanUsername || !cleanPassword) {
-            return res.status(400).json({ error: 'Usuario y contraseña requeridos' });
+            await addLog('LOGIN_FAILED', { username: cleanUsername || 'empty', reason: 'Campos vacíos', ip }, ip);
+            return res.status(400).json({ 
+                success: false,
+                error: 'Usuario y contraseña requeridos',
+                message: 'Por favor, proporciona un nombre de usuario y contraseña válidos'
+            });
         }
         
         const user = await verifyCredentials(cleanUsername, cleanPassword);
         
         if (!user) {
-            await addLog('LOGIN_FAILED', { username, ip }, ip);
-            return res.status(401).json({ error: 'Credenciales inválidas' });
+            await addLog('LOGIN_FAILED', { username: cleanUsername, ip }, ip);
+            return res.status(401).json({ 
+                success: false,
+                error: 'Credenciales inválidas',
+                message: 'El nombre de usuario o contraseña son incorrectos'
+            });
         }
         
         // Generar JWT
@@ -791,21 +830,29 @@ app.post('/api/auth/login', apiLimiter, async (req, res) => {
         );
         
         // Crear o actualizar sesión
-        const userAgent = req.headers['user-agent'] || 'Unknown';
         await createOrUpdateSession(user.username, token, ip, userAgent);
         
-        await addLog('LOGIN_SUCCESS', { username: user.username, ip }, ip);
+        await addLog('LOGIN_SUCCESS', { username: user.username, ip, userAgent }, ip);
         
+        // Respuesta consistente para Python
         res.json({
             success: true,
             token: token,
             user: {
                 username: user.username,
                 role: user.role
-            }
+            },
+            message: 'Inicio de sesión exitoso'
         });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Error en login:', error);
+        const ip = getClientIp(req);
+        await addLog('LOGIN_ERROR', { error: error.message, ip }, ip);
+        res.status(500).json({ 
+            success: false,
+            error: error.message || 'Error interno del servidor',
+            message: 'Ocurrió un error al procesar el inicio de sesión'
+        });
     }
 });
 
@@ -1020,12 +1067,35 @@ app.post('/api/users/:username/change-password', authenticateToken, apiLimiter, 
 // ==================== RUTAS ====================
 
 // Obtener todos los tokens (requiere autenticación)
-app.get('/api/tokens', authenticateToken, apiLimiter, async (req, res) => {
+// Obtener tokens (requiere autenticación, pero permite obtener solo disponibles para sincronización)
+app.get('/api/tokens', optionalAuth, apiLimiter, async (req, res) => {
     try {
+        const { availableOnly = false } = req.query;
         const tokens = await loadTokens();
-        res.json(tokens);
+        
+        // Si se solicita solo disponibles y no hay autenticación, devolver solo tokens disponibles
+        // Esto permite que el launcher Python sincronice tokens sin autenticación completa
+        if (availableOnly === 'true' || availableOnly === true) {
+            const availableTokens = tokens.filter(t => !t.used);
+            return res.json(availableTokens);
+        }
+        
+        // Si está autenticado, devolver todos los tokens
+        if (req.user) {
+            return res.json(tokens);
+        }
+        
+        // Si no está autenticado y no se solicita solo disponibles, devolver error
+        return res.status(401).json({ 
+            error: 'Autenticación requerida para ver todos los tokens',
+            message: 'Para ver todos los tokens, incluye un token de autenticación en el header Authorization'
+        });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Error al obtener tokens:', error);
+        res.status(500).json({ 
+            error: error.message,
+            message: 'Error al cargar tokens desde el servidor'
+        });
     }
 });
 
@@ -1077,42 +1147,50 @@ app.post('/api/tokens/generate', authenticateToken, apiLimiter, async (req, res)
 });
 
 // Validar token (usado por el launcher - requiere autenticación)
-app.post('/api/validate-token', authenticateToken, validateLimiter, async (req, res) => {
+// Validar token (permite validación con o sin autenticación para compatibilidad con Python)
+app.post('/api/validate-token', optionalAuth, validateLimiter, async (req, res) => {
     try {
-        const { token } = req.body;
+        const { token, timestamp } = req.body;
         const ip = getClientIp(req);
         const userAgent = req.headers['user-agent'] || 'Unknown';
         
-        // Obtener usuario del token JWT
-        const username = req.user ? req.user.username : 'Unknown';
+        // Obtener usuario del token JWT si está autenticado, sino usar 'Launcher' como default
+        const username = req.user ? req.user.username : 'Launcher';
         
-        if (!token) {
-            await addToHistory(token, ip, userAgent, false, 'Token no proporcionado', username);
+        // Validar que el token esté presente
+        if (!token || typeof token !== 'string' || !token.trim()) {
+            await addToHistory(token || 'N/A', ip, userAgent, false, 'Token no proporcionado o inválido', username);
             return res.status(400).json({
                 valid: false,
                 success: false,
-                error: 'Token no proporcionado'
+                error: 'Token no proporcionado o inválido',
+                message: 'Token no proporcionado o inválido'
             });
         }
         
+        const trimmedToken = token.trim();
         const tokens = await loadTokens();
-        const tokenRecord = tokens.find(t => t.token === token);
+        const tokenRecord = tokens.find(t => t.token === trimmedToken);
         
         if (!tokenRecord) {
-            await addToHistory(token, ip, userAgent, false, 'Token no encontrado', username);
+            await addToHistory(trimmedToken, ip, userAgent, false, 'Token no encontrado en la base de datos', username);
             return res.status(400).json({
                 valid: false,
                 success: false,
-                error: 'Token no encontrado'
+                error: 'Token no encontrado',
+                message: 'El token proporcionado no existe en el sistema'
             });
         }
         
         if (tokenRecord.used) {
-            await addToHistory(token, ip, userAgent, false, 'Token ya ha sido usado', username);
+            await addToHistory(trimmedToken, ip, userAgent, false, 'Token ya ha sido usado anteriormente', username);
             return res.status(400).json({
                 valid: false,
                 success: false,
-                error: 'Token ya ha sido usado'
+                error: 'Token ya ha sido usado',
+                message: 'Este token ya fue utilizado y no puede ser reutilizado',
+                usedAt: tokenRecord.usedAt,
+                usedFromIp: tokenRecord.usedFromIp
             });
         }
         
@@ -1121,25 +1199,32 @@ app.post('/api/validate-token', authenticateToken, validateLimiter, async (req, 
         tokenRecord.usedAt = new Date().toISOString();
         tokenRecord.usedFromIp = ip;
         tokenRecord.validatedBy = username;
+        tokenRecord.validatedAt = timestamp || new Date().toISOString();
         await saveTokens(tokens);
         
         // Registrar en historial (con información del usuario)
-        await addToHistory(token, ip, userAgent, true, null, username);
+        await addToHistory(trimmedToken, ip, userAgent, true, null, username);
         
+        // Respuesta consistente para Python
         res.json({
             valid: true,
             success: true,
-            message: 'Token válido'
+            message: 'Token válido y marcado como usado',
+            token: trimmedToken,
+            validatedAt: tokenRecord.usedAt
         });
     } catch (error) {
         const ip = getClientIp(req);
         const userAgent = req.headers['user-agent'] || 'Unknown';
-        const username = req.user ? req.user.username : 'Unknown';
-        await addToHistory(req.body.token || 'N/A', ip, userAgent, false, error.message, username);
+        const username = req.user ? req.user.username : 'Launcher';
+        const token = req.body?.token || 'N/A';
+        await addToHistory(token, ip, userAgent, false, error.message, username);
+        console.error('Error al validar token:', error);
         res.status(500).json({
             valid: false,
             success: false,
-            error: error.message
+            error: error.message || 'Error interno del servidor',
+            message: 'Error al procesar la validación del token'
         });
     }
 });
@@ -1496,9 +1581,21 @@ app.get('/api/alerts', authenticateToken, apiLimiter, async (req, res) => {
     try {
         const username = req.user.username;
         const alerts = await getUserAlerts(username);
-        res.json(alerts);
+        // Respuesta consistente para Python
+        res.json({
+            success: true,
+            alerts: Array.isArray(alerts) ? alerts : [],
+            count: Array.isArray(alerts) ? alerts.length : 0
+        });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Error al obtener alertas:', error);
+        res.status(500).json({ 
+            success: false,
+            error: error.message,
+            alerts: [],
+            count: 0,
+            message: 'Error al cargar alertas desde el servidor'
+        });
     }
 });
 
@@ -1552,9 +1649,18 @@ app.post('/api/alerts/:alertId/read', authenticateToken, apiLimiter, async (req,
         const username = req.user.username;
         
         await markAlertAsRead(alertId, username);
-        res.json({ success: true });
+        res.json({ 
+            success: true,
+            message: 'Alerta marcada como leída',
+            alertId: alertId
+        });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Error al marcar alerta como leída:', error);
+        res.status(500).json({ 
+            success: false,
+            error: error.message,
+            message: 'Error al marcar la alerta como leída'
+        });
     }
 });
 
