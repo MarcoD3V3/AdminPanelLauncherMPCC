@@ -1,97 +1,95 @@
 [
   {
-    "id": "693fef7b0b4f6398e0b381f1f9674b4d",
-    "title": "Mantenimiento",
-    "message": "el launcher se va a actualizar",
+    "id": "9a9facdc4e027c22beecf5e0f760c82a",
+    "title": "asdasda",
+    "message": "sadasda",
     "targetUser": null,
-    "type": "warning",
-    "category": "maintenance",
-    "metadata": {
-      "priority": "high",
-      "startDate": "0111-11-11T19:11:12.000Z",
-      "endDate": "2222-02-22T19:02:00.000Z",
-      "serverStatus": "maintenance"
-    },
-    "createdAt": "2025-11-10T07:48:28.133Z",
-    "expiresAt": null,
-    "priority": "high",
-    "read": true,
-    "readBy": [
-      "123123"
-    ]
-  },
-  {
-    "id": "a41bbb956b700473b8855c4a12124ece",
-    "title": "awdawd",
-    "message": "dawdawd",
-    "targetUser": null,
-    "type": "warning",
-    "category": "update",
-    "metadata": {
-      "priority": "high",
-      "version": "dawd",
-      "forceUpdate": true
-    },
-    "createdAt": "2025-11-10T07:53:34.068Z",
-    "expiresAt": null,
-    "priority": "high",
-    "read": true,
-    "readBy": [
-      "123123"
-    ]
-  },
-  {
-    "id": "ead7e88126ecbc24cd910a28f8a9c499",
-    "title": "vxvxcvxcvcxv",
-    "message": "cvxcvxvvxcvvf",
-    "targetUser": "fff",
     "type": "info",
-    "category": "reminder",
+    "category": "config",
     "metadata": {
       "priority": "normal",
-      "reminderDate": "2026-01-01T04:58:00.000Z",
-      "reminderType": "task"
+      "serverIp": "mc.aternos.me.com",
+      "serverPort": 25564,
+      "mcVersion": "1.20.1",
+      "autoApply": true
     },
-    "createdAt": "2025-11-10T07:58:01.899Z",
+    "createdAt": "2025-11-10T19:39:17.408Z",
     "expiresAt": null,
     "priority": "normal",
-    "read": false,
-    "readBy": []
+    "read": true,
+    "readBy": [
+      "Nando",
+      "nyurka",
+      "palagente",
+      "admin",
+      "123123"
+    ]
   },
   {
-    "id": "1e8e96c768c13ca45a1dd65fbb4cf818",
-    "title": "ererererr",
-    "message": "erfff",
+    "id": "44e13d7a5342a2eef7828baced767d4d",
+    "title": "suspencios",
+    "message": "fuiste baneado por las liguientes razones",
     "targetUser": null,
-    "type": "error",
+    "type": "warning",
+    "category": "restriction",
+    "metadata": {
+      "priority": "high",
+      "restrictionType": "ban",
+      "duration": 2,
+      "reason": "intento de hackeo a la base de datos "
+    },
+    "createdAt": "2025-11-10T19:40:47.426Z",
+    "expiresAt": null,
+    "priority": "high",
+    "read": true,
+    "readBy": [
+      "Nando",
+      "nyurka",
+      "palagente",
+      "admin",
+      "123123"
+    ]
+  },
+  {
+    "id": "e3265ec2c35e1fec9781b760e3b4f881",
+    "title": "JUEGA YAA!!",
+    "message": "evento en la version 1.20.1",
+    "targetUser": null,
+    "type": "info",
     "category": "event",
     "metadata": {
       "priority": "normal",
+      "eventDate": "3355-12-04T23:54:00.000Z",
+      "duration": 4,
       "eventType": "tournament"
     },
-    "createdAt": "2025-11-10T07:58:31.386Z",
+    "createdAt": "2025-11-10T19:42:07.933Z",
     "expiresAt": null,
     "priority": "normal",
     "read": true,
     "readBy": [
+      "Nando",
+      "nyurka",
+      "admin",
       "123123"
     ]
   },
   {
-    "id": "9f9bd6e0c007d8df3111d81e1ae01a46",
-    "title": "dddcdsdf",
-    "message": "fsfe",
-    "targetUser": null,
+    "id": "42da7bb07dbcef0ad7abf7b40c4d82ca",
+    "title": "JUEGA YAA!!",
+    "message": "marcoceladita gaspar el gaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "targetUser": "Nando",
     "type": "info",
-    "category": "maintenance",
+    "category": "alert",
     "metadata": {
-      "priority": "normal",
-      "serverStatus": "offline"
+      "priority": "normal"
     },
-    "createdAt": "2025-11-10T08:07:14.039Z",
+    "createdAt": "2025-11-10T23:01:32.101Z",
     "expiresAt": null,
     "priority": "normal",
-    "read": false,
-    "readBy": []
+    "read": true,
+    "readBy": [
+      "Nando"
+    ]
   }
 ]

@@ -1,22 +1,44 @@
 [
   {
-    "id": "41e102c0069a4431541b3cd86f6b57d5",
+    "id": "4791922fc4b9d0b29c211b03f53c7d0f",
     "username": "admin",
     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFkbWluIiwicm9sZSI6ImFkbWluIiwiaWF0IjoxNzYyNzUyNjM3LCJleHAiOjE3NjMzNTc0Mzd9.ex2Rn1yEzbdeE0dACPdeC8CbZqHFG5oNDu14rdnsSLM",
     "ip": "::1",
     "userAgent": "node-fetch/1.0 (+https://github.com/bitinn/node-fetch)",
-    "startedAt": "2025-11-10T07:32:22.781Z",
-    "lastActivity": "2025-11-10T17:15:48.668Z",
+    "startedAt": "2025-11-12T02:32:00.178Z",
+    "lastActivity": "2025-11-12T02:38:30.754Z",
+    "active": false,
+    "revokedAt": "2025-11-12T02:39:04.381Z",
+    "revokedReason": "Nueva sesión iniciada"
+  },
+  {
+    "id": "2ad95d3fbb30fece4d946c5beddca914",
+    "username": "nyurka",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6Im55dXJrYSIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzYyOTE0OTAwLCJleHAiOjE3NjM1MTk3MDB9.dkcdfx5s_6rA0zFWS7Ev4slbqzIXpYeSm8qOEq5zg4o",
+    "ip": "::1",
+    "userAgent": "node-fetch/1.0 (+https://github.com/bitinn/node-fetch)",
+    "startedAt": "2025-11-12T02:35:00.968Z",
+    "lastActivity": "2025-11-12T02:38:31.939Z",
     "active": true
   },
   {
-    "id": "51130c71f8f8b053f17d7becea224252",
-    "username": "123123",
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6IjEyMzEyMyIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzYyNzYwNzgzLCJleHAiOjE3NjMzNjU1ODN9.lENb1Pq9SrtoNmgWialLA2ivclKOP1dgtCGqYVTA5oY",
+    "id": "2c1c36fab2b62ceb8ef670686400b92f",
+    "username": "admin",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFkbWluIiwicm9sZSI6ImFkbWluIiwiaWF0IjoxNzYyOTE1MTQ0LCJleHAiOjE3NjM1MTk5NDR9.2m5LsA-_OwFCLPduZeeCIeANXiUU_lcrcJ7WA-2ZRWg",
     "ip": "::1",
     "userAgent": "node-fetch/1.0 (+https://github.com/bitinn/node-fetch)",
-    "startedAt": "2025-11-10T07:46:23.776Z",
-    "lastActivity": "2025-11-10T17:04:13.349Z",
+    "startedAt": "2025-11-12T02:39:04.381Z",
+    "lastActivity": "2025-11-12T02:43:44.442Z",
+    "active": true
+  },
+  {
+    "id": "2d85c161123bf9c1fe3ae7482ed6583c",
+    "username": "123123",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6IjEyMzEyMyIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzYyOTE1MTcyLCJleHAiOjE3NjM1MTk5NzJ9.GLT1RopMyoEhAjMRIUqEjTqDPuFdPlKDEOdl8znCNwI",
+    "ip": "::1",
+    "userAgent": "node-fetch/1.0 (+https://github.com/bitinn/node-fetch)",
+    "startedAt": "2025-11-12T02:39:32.971Z",
+    "lastActivity": "2025-11-12T02:43:43.017Z",
     "active": true
   }
 ]

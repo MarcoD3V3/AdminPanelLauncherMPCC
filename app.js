@@ -606,6 +606,126 @@ function getCategoryName(category) {
     return names[category] || 'Alerta';
 }
 
+// Función para formatear metadata visualmente en el modal de detalles
+function formatMetadataVisual(metadata, category) {
+    if (!metadata || Object.keys(metadata).length === 0) {
+        return '<div class="metadata-empty"><i class="fas fa-info-circle"></i> No hay metadata adicional</div>';
+    }
+    
+    const fieldConfig = {
+        'priority': { icon: 'fa-flag', label: 'Prioridad', type: 'badge' },
+        'startDate': { icon: 'fa-calendar-plus', label: 'Fecha de Inicio', type: 'date' },
+        'endDate': { icon: 'fa-calendar-check', label: 'Fecha de Fin', type: 'date' },
+        'serverStatus': { icon: 'fa-server', label: 'Estado del Servidor', type: 'status' },
+        'version': { icon: 'fa-code-branch', label: 'Versión', type: 'text' },
+        'forceUpdate': { icon: 'fa-exclamation-triangle', label: 'Actualización Forzada', type: 'boolean' },
+        'downloadUrl': { icon: 'fa-link', label: 'URL de Descarga', type: 'link' },
+        'eventDate': { icon: 'fa-calendar', label: 'Fecha del Evento', type: 'date' },
+        'duration': { icon: 'fa-hourglass-half', label: 'Duración', type: 'text' },
+        'eventType': { icon: 'fa-star', label: 'Tipo de Evento', type: 'text' },
+        'rewardType': { icon: 'fa-gift', label: 'Tipo de Recompensa', type: 'text' },
+        'rewardValue': { icon: 'fa-coins', label: 'Valor de Recompensa', type: 'value' },
+        'rewardCode': { icon: 'fa-ticket-alt', label: 'Código de Recompensa', type: 'code' },
+        'restrictionType': { icon: 'fa-ban', label: 'Tipo de Restricción', type: 'text' },
+        'reason': { icon: 'fa-comment', label: 'Razón', type: 'text' },
+        'serverIp': { icon: 'fa-network-wired', label: 'IP del Servidor', type: 'text' },
+        'serverPort': { icon: 'fa-plug', label: 'Puerto del Servidor', type: 'text' },
+        'mcVersion': { icon: 'fa-cube', label: 'Versión de Minecraft', type: 'text' },
+        'autoApply': { icon: 'fa-magic', label: 'Aplicar Automáticamente', type: 'boolean' },
+        'achievementName': { icon: 'fa-trophy', label: 'Nombre del Logro', type: 'text' },
+        'level': { icon: 'fa-level-up-alt', label: 'Nivel', type: 'number' },
+        'points': { icon: 'fa-star', label: 'Puntos', type: 'number' },
+        'promoType': { icon: 'fa-tag', label: 'Tipo de Promoción', type: 'text' },
+        'promoCode': { icon: 'fa-ticket-alt', label: 'Código Promocional', type: 'code' },
+        'discount': { icon: 'fa-percent', label: 'Descuento', type: 'percent' },
+        'expiresAt': { icon: 'fa-calendar-times', label: 'Expira', type: 'date' },
+        'reminderDate': { icon: 'fa-bell', label: 'Fecha de Recordatorio', type: 'date' },
+        'reminderType': { icon: 'fa-list', label: 'Tipo de Recordatorio', type: 'text' },
+        'command': { icon: 'fa-terminal', label: 'Comando', type: 'code' },
+        'params': { icon: 'fa-cogs', label: 'Parámetros', type: 'json' }
+    };
+    
+    let html = '<div class="metadata-visual-container">';
+    
+    // Ordenar campos según importancia
+    const orderedKeys = Object.keys(metadata).sort((a, b) => {
+        const priority = ['priority', 'version', 'rewardCode', 'promoCode', 'command'];
+        const aIndex = priority.indexOf(a);
+        const bIndex = priority.indexOf(b);
+        if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+        if (aIndex !== -1) return -1;
+        if (bIndex !== -1) return 1;
+        return a.localeCompare(b);
+    });
+    
+    orderedKeys.forEach(key => {
+        const value = metadata[key];
+        const config = fieldConfig[key] || { icon: 'fa-circle', label: key, type: 'text' };
+        
+        let displayValue = '';
+        let valueClass = 'metadata-value';
+        
+        switch(config.type) {
+            case 'badge':
+                const priorityLabels = { 'low': 'Baja', 'normal': 'Normal', 'high': 'Alta', 'urgent': 'Urgente' };
+                const priorityClass = value === 'urgent' ? 'badge-urgent' : 
+                                     value === 'high' ? 'badge-high' : 
+                                     value === 'low' ? 'badge-low' : 'badge-normal';
+                displayValue = `<span class="metadata-badge ${priorityClass}">${priorityLabels[value] || value}</span>`;
+                break;
+            case 'boolean':
+                displayValue = value ? 
+                    '<span class="metadata-badge badge-success"><i class="fas fa-check"></i> Sí</span>' : 
+                    '<span class="metadata-badge badge-error"><i class="fas fa-times"></i> No</span>';
+                break;
+            case 'date':
+                displayValue = `<span class="metadata-date">${formatDate(value)}</span>`;
+                break;
+            case 'link':
+                displayValue = `<a href="${value}" target="_blank" class="metadata-link"><i class="fas fa-external-link-alt"></i> ${value}</a>`;
+                break;
+            case 'code':
+                displayValue = `<span class="metadata-code">${value}</span>`;
+                break;
+            case 'value':
+                displayValue = `<span class="metadata-value-highlight">${value}</span>`;
+                break;
+            case 'percent':
+                displayValue = `<span class="metadata-percent">${value}%</span>`;
+                break;
+            case 'number':
+                displayValue = `<span class="metadata-number">${value}</span>`;
+                break;
+            case 'status':
+                const statusLabels = { 'online': 'En Línea', 'offline': 'Desconectado', 'maintenance': 'Mantenimiento' };
+                const statusClass = value === 'online' ? 'badge-success' : 
+                                   value === 'offline' ? 'badge-error' : 'badge-warning';
+                displayValue = `<span class="metadata-badge ${statusClass}">${statusLabels[value] || value}</span>`;
+                break;
+            case 'json':
+                displayValue = `<pre class="metadata-json">${JSON.stringify(value, null, 2)}</pre>`;
+                break;
+            default:
+                displayValue = `<span class="metadata-text">${value}</span>`;
+        }
+        
+        html += `
+            <div class="metadata-field">
+                <div class="metadata-label">
+                    <i class="fas ${config.icon}"></i>
+                    <span>${config.label}</span>
+                </div>
+                <div class="metadata-content">
+                    ${displayValue}
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    return html;
+}
+
 // Función para formatear metadata según la categoría
 function formatAlertMetadata(alert) {
     if (!alert.metadata) return '';
@@ -682,6 +802,7 @@ function renderAlerts(alerts) {
     const hasActiveMaintenance = alerts.some(alert => 
         alert.category === 'maintenance' && 
         alert.metadata && 
+        
         (alert.metadata.serverStatus === 'maintenance' || alert.metadata.serverStatus === 'offline')
     );
     
@@ -1101,12 +1222,12 @@ function showAlertDetails(alertId) {
     document.getElementById('alert-details-read').textContent = alert.read ? 'Sí' : 'No';
     document.getElementById('alert-details-readBy').textContent = alert.readBy && alert.readBy.length > 0 ? alert.readBy.join(', ') : 'Ninguno';
     
-    // Mostrar metadata completa
+    // Mostrar metadata completa con formato visual
     const metadataContainer = document.getElementById('alert-details-metadata');
     if (alert.metadata && Object.keys(alert.metadata).length > 0) {
-        metadataContainer.innerHTML = '<pre>' + JSON.stringify(alert.metadata, null, 2) + '</pre>';
+        metadataContainer.innerHTML = formatMetadataVisual(alert.metadata, alert.category);
     } else {
-        metadataContainer.innerHTML = '<p style="color: var(--text-secondary);">No hay metadata adicional</p>';
+        metadataContainer.innerHTML = '<div class="metadata-empty"><i class="fas fa-info-circle"></i> No hay metadata adicional</div>';
     }
     
     // Mostrar el modal

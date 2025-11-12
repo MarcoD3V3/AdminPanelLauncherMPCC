@@ -1,4 +1,5 @@
 const express = require('express');
+const http = require('http');
 const cors = require('cors');
 const crypto = require('crypto');
 const fs = require('fs').promises;
@@ -8,8 +9,19 @@ const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { Server } = require('socket.io');
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"],
+        credentials: true
+    },
+    transports: ['websocket', 'polling'], // Asegurar compatibilidad con Railway/Heroku
+    allowEIO3: true // Compatibilidad con versiones antiguas
+});
 const TOKENS_FILE = path.join(__dirname, 'tokens.json');
 const HISTORY_FILE = path.join(__dirname, 'validation_history.json');
 const LOGS_FILE = path.join(__dirname, 'activity_logs.json');
@@ -21,6 +33,10 @@ const JWT_SECRET_FILE = path.join(__dirname, '.jwt_secret');
 
 // Almacenamiento en memoria de sesiones activas (para acceso rápido)
 let activeSessions = new Map();
+
+// Almacenamiento de conexiones WebSocket activas (para chat)
+let activeConnections = new Map(); // Map<socketId, {username, token, socket}>
+let userMessages = new Map(); // Map<username, [{from, to, message, timestamp}]>
 
 // Cargar o generar JWT_SECRET de forma persistente
 function loadOrCreateJWTSecret() {
@@ -72,6 +88,13 @@ const validateLimiter = rateLimit({
 const apiLimiter = rateLimit({
     windowMs: 1 * 60 * 1000, // 1 minuto
     max: 30, // 30 peticiones por minuto
+    message: 'Demasiadas peticiones, intenta más tarde'
+});
+
+// Rate limiting para chat (más permisivo)
+const chatLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minuto
+    max: 100, // 100 peticiones por minuto (más permisivo para chat)
     message: 'Demasiadas peticiones, intenta más tarde'
 });
 
@@ -698,13 +721,22 @@ function authenticateToken(req, res, next) {
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
     
     if (!token) {
+        console.log('❌ API: Token no proporcionado en header Authorization');
         return res.status(401).json({ error: 'Token de acceso requerido' });
     }
     
+    console.log('🔍 API: Verificando token (primeros 20 chars):', token.substring(0, 20) + '...');
+    
     jwt.verify(token, JWT_SECRET, (err, user) => {
         if (err) {
+            console.log('❌ API: Error al verificar token:', err.message);
+            console.log('❌ API: Tipo de error:', err.name);
+            if (err.name === 'TokenExpiredError') {
+                console.log('❌ API: Token expirado en:', err.expiredAt);
+            }
             return res.status(403).json({ error: 'Token inválido o expirado' });
         }
+        console.log('✅ API: Token válido para usuario:', user.username);
         req.user = user;
         req.token = token;
         // Actualizar última actividad de la sesión
@@ -1581,6 +1613,211 @@ app.post('/api/maintenance/disable', authenticateToken, apiLimiter, async (req, 
     }
 });
 
+// ==================== SISTEMA DE CHAT ====================
+
+// Endpoint para obtener usuarios activos
+app.get('/api/chat/active-users', authenticateToken, chatLimiter, async (req, res) => {
+    try {
+        const currentUsername = req.user.username;
+        const activeUsers = [];
+        
+        // Obtener usuarios de conexiones WebSocket activas
+        activeConnections.forEach((conn, socketId) => {
+            if (conn.username !== currentUsername) {
+                activeUsers.push({
+                    username: conn.username,
+                    socketId: socketId
+                });
+            }
+        });
+        
+        // También incluir usuarios de sesiones activas que no tienen conexión WebSocket
+        const sessions = await loadSessions();
+        const sessionUsers = new Set();
+        sessions.forEach(session => {
+            if (session.active && session.username !== currentUsername) {
+                sessionUsers.add(session.username);
+            }
+        });
+        
+        // Agregar usuarios de sesiones que no están en conexiones WebSocket
+        sessionUsers.forEach(username => {
+            const alreadyInList = activeUsers.some(u => u.username === username);
+            if (!alreadyInList) {
+                activeUsers.push({
+                    username: username,
+                    socketId: null // No tiene conexión WebSocket activa
+                });
+            }
+        });
+        
+        res.json({ success: true, users: activeUsers });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Endpoint para obtener mensajes de un usuario
+app.get('/api/chat/messages/:username', authenticateToken, chatLimiter, async (req, res) => {
+    try {
+        const currentUsername = req.user.username;
+        const targetUsername = req.params.username;
+        
+        const messages = userMessages.get(currentUsername) || [];
+        const conversationMessages = messages.filter(msg => 
+            (msg.from === targetUsername && msg.to === currentUsername) ||
+            (msg.from === currentUsername && msg.to === targetUsername)
+        );
+        
+        res.json({ success: true, messages: conversationMessages });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// WebSocket handlers para chat
+io.on('connection', (socket) => {
+    console.log(`🔌 Nueva conexión WebSocket: ${socket.id}`);
+    
+    // Autenticar conexión
+    socket.on('authenticate', async (data) => {
+        try {
+            const { token } = data;
+            if (!token) {
+                console.log('❌ WebSocket: Token no proporcionado');
+                socket.emit('error', { message: 'Token requerido' });
+                return;
+            }
+            
+            // Verificar token
+            jwt.verify(token, JWT_SECRET, (err, user) => {
+                if (err) {
+                    console.log('❌ WebSocket: Error al verificar token:', err.message);
+                    socket.emit('error', { message: `Token inválido: ${err.message}` });
+                    return;
+                }
+                
+                console.log(`✅ WebSocket: Token válido para usuario: ${user.username}`);
+                
+                // Guardar conexión
+                activeConnections.set(socket.id, {
+                    username: user.username,
+                    token: token,
+                    socket: socket
+                });
+                
+                socket.emit('authenticated', { username: user.username });
+                
+                // Notificar a otros usuarios que este usuario está en línea
+                io.emit('user-online', { username: user.username });
+                
+                console.log(`✅ Usuario autenticado en WebSocket: ${user.username}`);
+            });
+        } catch (error) {
+            console.error('❌ WebSocket: Error en authenticate:', error);
+            socket.emit('error', { message: error.message });
+        }
+    });
+    
+    // Enviar mensaje privado
+    socket.on('private-message', async (data) => {
+        try {
+            const connection = activeConnections.get(socket.id);
+            if (!connection) {
+                socket.emit('error', { message: 'No autenticado' });
+                return;
+            }
+            
+            const { to, message } = data;
+            if (!to || !message) {
+                socket.emit('error', { message: 'Destinatario y mensaje requeridos' });
+                return;
+            }
+            
+            const from = connection.username;
+            const timestamp = new Date().toISOString();
+            
+            const messageData = {
+                from,
+                to,
+                message,
+                timestamp
+            };
+            
+            // Guardar mensaje para ambos usuarios
+            if (!userMessages.has(from)) {
+                userMessages.set(from, []);
+            }
+            if (!userMessages.has(to)) {
+                userMessages.set(to, []);
+            }
+            
+            userMessages.get(from).push(messageData);
+            userMessages.get(to).push(messageData);
+            
+            // Enviar mensaje al destinatario si está conectado
+            let sent = false;
+            activeConnections.forEach((conn, socketId) => {
+                if (conn.username === to) {
+                    console.log(`📤 Enviando mensaje de ${from} a ${to} (socket: ${socketId})`);
+                    conn.socket.emit('private-message', messageData);
+                    sent = true;
+                }
+            });
+            
+            // También enviar el mensaje de vuelta al remitente para confirmación
+            // Esto asegura que el mensaje se muestre correctamente en ambos lados
+            socket.emit('private-message', messageData);
+            
+            // Confirmar al remitente
+            socket.emit('message-sent', { ...messageData, delivered: sent });
+            
+            console.log(`✅ Mensaje de ${from} a ${to} ${sent ? 'entregado' : 'guardado (destinatario offline)'}`);
+            
+            // Si el destinatario no está conectado, el mensaje se guardará y se entregará cuando se conecte
+        } catch (error) {
+            socket.emit('error', { message: error.message });
+        }
+    });
+    
+    // Obtener usuarios activos
+    socket.on('get-active-users', () => {
+        const connection = activeConnections.get(socket.id);
+        if (!connection) {
+            socket.emit('error', { message: 'No autenticado' });
+            return;
+        }
+        
+        const currentUsername = connection.username;
+        const activeUsers = [];
+        
+        activeConnections.forEach((conn, socketId) => {
+            if (conn.username !== currentUsername) {
+                activeUsers.push({
+                    username: conn.username,
+                    socketId: socketId
+                });
+            }
+        });
+        
+        socket.emit('active-users', { users: activeUsers });
+    });
+    
+    // Desconexión
+    socket.on('disconnect', () => {
+        const connection = activeConnections.get(socket.id);
+        if (connection) {
+            const username = connection.username;
+            activeConnections.delete(socket.id);
+            
+            // Notificar a otros usuarios que este usuario se desconectó
+            io.emit('user-offline', { username });
+            
+            console.log(`🔌 Usuario desconectado: ${username}`);
+        }
+    });
+});
+
 // ==================== INICIALIZACIÓN DEL SERVIDOR ====================
 
 // Función para inicializar y cargar todos los datos al inicio
@@ -1632,18 +1869,20 @@ const PORT = process.env.PORT || 3000;
 
 // Inicializar datos antes de iniciar el servidor
 initializeServer().then(() => {
-    app.listen(PORT, () => {
+    server.listen(PORT, () => {
         console.log(`🚀 Servidor de administración corriendo en puerto ${PORT}`);
         console.log(`📊 Panel de administración: http://localhost:${PORT}/index.html`);
         console.log(`🔗 Endpoint de validación: http://localhost:${PORT}/api/validate-token`);
+        console.log(`💬 Sistema de chat WebSocket activo`);
         console.log('💾 Sistema de persistencia activo - Todos los cambios se guardan automáticamente');
     });
 }).catch(error => {
     console.error('❌ Error crítico al inicializar:', error);
     // Iniciar servidor de todas formas
-    app.listen(PORT, () => {
+    server.listen(PORT, () => {
         console.log(`🚀 Servidor de administración corriendo en puerto ${PORT} (con advertencias)`);
         console.log(`📊 Panel de administración: http://localhost:${PORT}/index.html`);
+        console.log(`💬 Sistema de chat WebSocket activo`);
     });
 });
 

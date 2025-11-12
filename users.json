@@ -18,5 +18,33 @@
     "role": "user",
     "createdAt": "2025-11-10T17:09:24.566Z",
     "createdBy": "admin"
+  },
+  {
+    "username": "nyurka",
+    "password": "$2a$10$.xDrwbcfDVPaTWBxlsHfnOgty6/d/wKAWnR.CgOCQcMxooTB1XT0W",
+    "role": "user",
+    "createdAt": "2025-11-10T23:02:45.909Z",
+    "createdBy": "admin"
+  },
+  {
+    "username": "palagente",
+    "password": "$2a$10$TWp/xzBerhdJmkPxH5r.Y.0DrugZaeOzp3PO02tJgvafXoQo/iKVy",
+    "role": "user",
+    "createdAt": "2025-11-10T23:04:03.885Z",
+    "createdBy": "admin"
+  },
+  {
+    "username": "mama",
+    "password": "$2a$10$EfsUJb0yhXDPii4Fjy0pF.zjPZRhTp6Nd6ey7h6G1oUhDQdEHy1RG",
+    "role": "user",
+    "createdAt": "2025-11-10T23:36:38.368Z",
+    "createdBy": "admin"
+  },
+  {
+    "username": "papa",
+    "password": "$2a$10$prNym8/SZcdMUxyBHESIg.fxbVaRcq5.uDipvEQMn1lGUdt/YhU7O",
+    "role": "user",
+    "createdAt": "2025-11-10T23:36:55.272Z",
+    "createdBy": "admin"
   }
 ]

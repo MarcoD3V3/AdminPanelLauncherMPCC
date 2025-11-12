@@ -1,0 +1,112 @@
+[
+  {
+    "id": "41e102c0069a4431541b3cd86f6b57d5",
+    "username": "admin",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFkbWluIiwicm9sZSI6ImFkbWluIiwiaWF0IjoxNzYyNzUyNjM3LCJleHAiOjE3NjMzNTc0Mzd9.ex2Rn1yEzbdeE0dACPdeC8CbZqHFG5oNDu14rdnsSLM",
+    "ip": "::1",
+    "userAgent": "node-fetch/1.0 (+https://github.com/bitinn/node-fetch)",
+    "startedAt": "2025-11-10T07:32:22.781Z",
+    "lastActivity": "2025-11-12T02:29:59.745Z",
+    "active": false,
+    "revokedAt": "2025-11-12T02:30:15.248Z",
+    "revokedReason": "Nueva sesión iniciada"
+  },
+  {
+    "id": "51130c71f8f8b053f17d7becea224252",
+    "username": "123123",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6IjEyMzEyMyIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzYyNzYwNzgzLCJleHAiOjE3NjMzNjU1ODN9.lENb1Pq9SrtoNmgWialLA2ivclKOP1dgtCGqYVTA5oY",
+    "ip": "::1",
+    "userAgent": "node-fetch/1.0 (+https://github.com/bitinn/node-fetch)",
+    "startedAt": "2025-11-10T07:46:23.776Z",
+    "lastActivity": "2025-11-10T17:04:13.349Z",
+    "active": true
+  },
+  {
+    "id": "6804ab4aa872233d5398e8c7379924c6",
+    "username": "Nando",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6Ik5hbmRvIiwicm9sZSI6InVzZXIiLCJpYXQiOjE3NjI4MDMxNDgsImV4cCI6MTc2MzQwNzk0OH0.elmcNH2sXcT3TO3U8lu_opCLPZf3qtgdTOkmvX7fAR8",
+    "ip": "::1",
+    "userAgent": "node-fetch/1.0 (+https://github.com/bitinn/node-fetch)",
+    "startedAt": "2025-11-10T19:32:28.092Z",
+    "lastActivity": "2025-11-10T19:33:00.810Z",
+    "active": false,
+    "revokedAt": "2025-11-10T19:33:34.221Z",
+    "revokedReason": "Nueva sesión iniciada"
+  },
+  {
+    "id": "02021b150a7d63c73cdc25f719adcf9e",
+    "username": "Nando",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6Ik5hbmRvIiwicm9sZSI6InVzZXIiLCJpYXQiOjE3NjI4MDMyMTQsImV4cCI6MTc2MzQwODAxNH0.7d-7vMyBYmDp6_Ml4K40bMoRSKKhbqt-TVJ_fjYBaVw",
+    "ip": "::1",
+    "userAgent": "node-fetch/1.0 (+https://github.com/bitinn/node-fetch)",
+    "startedAt": "2025-11-10T19:33:34.222Z",
+    "lastActivity": "2025-11-10T23:01:58.974Z",
+    "active": true
+  },
+  {
+    "id": "c6986c761bbd06ccb6c2408f127daf19",
+    "username": "nyurka",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6Im55dXJrYSIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzYyODE1Nzc1LCJleHAiOjE3NjM0MjA1NzV9.nk6_x8_mvHDB3kbagR319er3Ko1b7gPchEgzLqGW4Zw",
+    "ip": "::1",
+    "userAgent": "node-fetch/1.0 (+https://github.com/bitinn/node-fetch)",
+    "startedAt": "2025-11-10T23:02:55.006Z",
+    "lastActivity": "2025-11-10T23:03:25.225Z",
+    "active": true
+  },
+  {
+    "id": "c6083c5854bdd10e38365b0b08ba66b6",
+    "username": "palagente",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InBhbGFnZW50ZSIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzYyODE1ODUxLCJleHAiOjE3NjM0MjA2NTF9.JMJnvqBh-dcS1mpG-rQ_b0CaDLnZv1irCo-pvi65wvU",
+    "ip": "::1",
+    "userAgent": "node-fetch/1.0 (+https://github.com/bitinn/node-fetch)",
+    "startedAt": "2025-11-10T23:04:11.791Z",
+    "lastActivity": "2025-11-10T23:04:41.855Z",
+    "active": false,
+    "revokedAt": "2025-11-10T23:04:56.827Z",
+    "revokedReason": "Nueva sesión iniciada"
+  },
+  {
+    "id": "a4e841389cd6811cb945bbdf3e718c42",
+    "username": "palagente",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InBhbGFnZW50ZSIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzYyODE1ODk2LCJleHAiOjE3NjM0MjA2OTZ9.PB41i5LFzGREj8ieN-smzdIE1ifleAcay9HnZktCiho",
+    "ip": "::1",
+    "userAgent": "node-fetch/1.0 (+https://github.com/bitinn/node-fetch)",
+    "startedAt": "2025-11-10T23:04:56.827Z",
+    "lastActivity": "2025-11-10T23:36:56.941Z",
+    "active": true
+  },
+  {
+    "id": "15d22def8338c22882b184791e618aef",
+    "username": "papa",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InBhcGEiLCJyb2xlIjoidXNlciIsImlhdCI6MTc2MjgxNzgzNSwiZXhwIjoxNzYzNDIyNjM1fQ.xewSh6B76KcX6mghOJVbWD4DDiHXO4Tjxw9K3vmBtco",
+    "ip": "::1",
+    "userAgent": "node-fetch/1.0 (+https://github.com/bitinn/node-fetch)",
+    "startedAt": "2025-11-10T23:37:15.055Z",
+    "lastActivity": "2025-11-11T03:42:00.660Z",
+    "active": true
+  },
+  {
+    "id": "59555b9b99492547241e0fba524b785f",
+    "username": "admin",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFkbWluIiwicm9sZSI6ImFkbWluIiwiaWF0IjoxNzYyNzUyNjM3LCJleHAiOjE3NjMzNTc0Mzd9.ex2Rn1yEzbdeE0dACPdeC8CbZqHFG5oNDu14rdnsSLM",
+    "ip": "::1",
+    "userAgent": "node-fetch/1.0 (+https://github.com/bitinn/node-fetch)",
+    "startedAt": "2025-11-12T02:30:15.248Z",
+    "lastActivity": "2025-11-12T02:30:29.804Z",
+    "active": true
+  }
+]1-12T02:30:15.248Z",
+    "lastActivity": "2025-11-12T02:30:27.341Z",
+    "active": true
+  },
+  {
+    "id": "a77ab833b8e4c8b82205ed5cbb9a032d",
+    "username": "123123",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6IjEyMzEyMyIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzYyOTE0NjI5LCJleHAiOjE3NjM1MTk0Mjl9.isHJxndPOzaS1HYkMQ9dBeEUeVnJt_-vUhefphwUmpg",
+    "ip": "::1",
+    "userAgent": "node-fetch/1.0 (+https://github.com/bitinn/node-fetch)",
+    "startedAt": "2025-11-12T02:30:29.802Z",
+    "lastActivity": "2025-11-12T02:30:29.802Z",
+    "active": true
+  }
+]

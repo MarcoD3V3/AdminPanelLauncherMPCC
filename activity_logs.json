@@ -204,5 +204,358 @@
     },
     "ip": "::1",
     "timestamp": "2025-11-10T17:09:24.569Z"
+  },
+  {
+    "action": "LOGIN_SUCCESS",
+    "details": {
+      "username": "Nando",
+      "ip": "::1"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T19:32:28.096Z"
+  },
+  {
+    "action": "MAINTENANCE_DISABLED",
+    "details": {
+      "disabledBy": "admin"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T19:32:42.919Z"
+  },
+  {
+    "action": "ALERT_CREATED",
+    "details": {
+      "alertId": "8e290ed74f0ae0c4cb9adaf4f31b7ce0",
+      "title": "XD",
+      "category": "maintenance",
+      "targetUser": "all",
+      "createdBy": "admin"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T19:33:25.545Z"
+  },
+  {
+    "action": "LOGIN_SUCCESS",
+    "details": {
+      "username": "Nando",
+      "ip": "::1"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T19:33:34.227Z"
+  },
+  {
+    "action": "MAINTENANCE_DISABLED",
+    "details": {
+      "disabledBy": "admin"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T19:34:47.351Z"
+  },
+  {
+    "action": "ALERT_CREATED",
+    "details": {
+      "alertId": "28aac781df9ce5db818ad02907ab12ff",
+      "title": "Promocion",
+      "category": "promotion",
+      "targetUser": "all",
+      "createdBy": "admin"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T19:35:44.547Z"
+  },
+  {
+    "action": "ALERT_CREATED",
+    "details": {
+      "alertId": "0af62b3f2c0878bacc1cff1cff18271e",
+      "title": "s",
+      "category": "command",
+      "targetUser": "all",
+      "createdBy": "admin"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T19:36:37.925Z"
+  },
+  {
+    "action": "ALERT_CREATED",
+    "details": {
+      "alertId": "30531e6190cf546a1912387f1b4cc300",
+      "title": "mas potencia",
+      "category": "achievement",
+      "targetUser": "all",
+      "createdBy": "admin"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T19:37:38.540Z"
+  },
+  {
+    "action": "ALERT_DELETED",
+    "details": {
+      "alertId": "30531e6190cf546a1912387f1b4cc300",
+      "deletedBy": "admin"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T19:38:33.077Z"
+  },
+  {
+    "action": "ALERT_DELETED",
+    "details": {
+      "alertId": "0af62b3f2c0878bacc1cff1cff18271e",
+      "deletedBy": "admin"
+    },
+    "ip": "::ffff:127.0.0.1",
+    "timestamp": "2025-11-10T19:38:35.331Z"
+  },
+  {
+    "action": "ALERT_DELETED",
+    "details": {
+      "alertId": "28aac781df9ce5db818ad02907ab12ff",
+      "deletedBy": "admin"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T19:38:36.988Z"
+  },
+  {
+    "action": "ALERT_DELETED",
+    "details": {
+      "alertId": "8e290ed74f0ae0c4cb9adaf4f31b7ce0",
+      "deletedBy": "admin"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T19:38:38.774Z"
+  },
+  {
+    "action": "ALERT_DELETED",
+    "details": {
+      "alertId": "9f9bd6e0c007d8df3111d81e1ae01a46",
+      "deletedBy": "admin"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T19:38:40.044Z"
+  },
+  {
+    "action": "ALERT_DELETED",
+    "details": {
+      "alertId": "1e8e96c768c13ca45a1dd65fbb4cf818",
+      "deletedBy": "admin"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T19:38:41.481Z"
+  },
+  {
+    "action": "ALERT_DELETED",
+    "details": {
+      "alertId": "ead7e88126ecbc24cd910a28f8a9c499",
+      "deletedBy": "admin"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T19:38:42.700Z"
+  },
+  {
+    "action": "ALERT_DELETED",
+    "details": {
+      "alertId": "a41bbb956b700473b8855c4a12124ece",
+      "deletedBy": "admin"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T19:38:45.908Z"
+  },
+  {
+    "action": "ALERT_DELETED",
+    "details": {
+      "alertId": "693fef7b0b4f6398e0b381f1f9674b4d",
+      "deletedBy": "admin"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T19:38:47.281Z"
+  },
+  {
+    "action": "ALERT_CREATED",
+    "details": {
+      "alertId": "9a9facdc4e027c22beecf5e0f760c82a",
+      "title": "asdasda",
+      "category": "config",
+      "targetUser": "all",
+      "createdBy": "admin"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T19:39:17.412Z"
+  },
+  {
+    "action": "ALERT_CREATED",
+    "details": {
+      "alertId": "44e13d7a5342a2eef7828baced767d4d",
+      "title": "suspencios",
+      "category": "restriction",
+      "targetUser": "all",
+      "createdBy": "admin"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T19:40:47.429Z"
+  },
+  {
+    "action": "ALERT_CREATED",
+    "details": {
+      "alertId": "e3265ec2c35e1fec9781b760e3b4f881",
+      "title": "JUEGA YAA!!",
+      "category": "event",
+      "targetUser": "all",
+      "createdBy": "admin"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T19:42:07.938Z"
+  },
+  {
+    "action": "ALERT_CREATED",
+    "details": {
+      "alertId": "42da7bb07dbcef0ad7abf7b40c4d82ca",
+      "title": "JUEGA YAA!!",
+      "category": "alert",
+      "targetUser": "Nando",
+      "createdBy": "admin"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T23:01:32.105Z"
+  },
+  {
+    "action": "USER_CREATED",
+    "details": {
+      "username": "nyurka",
+      "role": "user",
+      "createdBy": "admin"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T23:02:45.912Z"
+  },
+  {
+    "action": "LOGIN_SUCCESS",
+    "details": {
+      "username": "nyurka",
+      "ip": "::1"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T23:02:55.010Z"
+  },
+  {
+    "action": "USER_CREATED",
+    "details": {
+      "username": "palagente",
+      "role": "user",
+      "createdBy": "admin"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T23:04:03.888Z"
+  },
+  {
+    "action": "LOGIN_SUCCESS",
+    "details": {
+      "username": "palagente",
+      "ip": "::1"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T23:04:11.802Z"
+  },
+  {
+    "action": "LOGIN_SUCCESS",
+    "details": {
+      "username": "palagente",
+      "ip": "::1"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T23:04:56.832Z"
+  },
+  {
+    "action": "USER_CREATED",
+    "details": {
+      "username": "mama",
+      "role": "user",
+      "createdBy": "admin"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T23:36:38.371Z"
+  },
+  {
+    "action": "USER_CREATED",
+    "details": {
+      "username": "papa",
+      "role": "user",
+      "createdBy": "admin"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T23:36:55.275Z"
+  },
+  {
+    "action": "LOGIN_SUCCESS",
+    "details": {
+      "username": "papa",
+      "ip": "::1"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T23:37:15.061Z"
+  },
+  {
+    "action": "CONFIG_UPDATED",
+    "details": {
+      "changes": {
+        "maxTokens": 2,
+        "rateLimitEnabled": true,
+        "notificationsEnabled": true
+      }
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-10T23:38:49.798Z"
+  },
+  {
+    "action": "LOGIN_SUCCESS",
+    "details": {
+      "username": "admin",
+      "ip": "::1"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-12T02:30:15.251Z"
+  },
+  {
+    "action": "LOGIN_SUCCESS",
+    "details": {
+      "username": "123123",
+      "ip": "::1"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-12T02:30:29.808Z"
+  },
+  {
+    "action": "LOGIN_SUCCESS",
+    "details": {
+      "username": "admin",
+      "ip": "::1"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-12T02:32:00.180Z"
+  },
+  {
+    "action": "LOGIN_SUCCESS",
+    "details": {
+      "username": "nyurka",
+      "ip": "::1"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-12T02:35:00.971Z"
+  },
+  {
+    "action": "LOGIN_SUCCESS",
+    "details": {
+      "username": "admin",
+      "ip": "::1"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-12T02:39:04.383Z"
+  },
+  {
+    "action": "LOGIN_SUCCESS",
+    "details": {
+      "username": "123123",
+      "ip": "::1"
+    },
+    "ip": "::1",
+    "timestamp": "2025-11-12T02:39:32.973Z"
   }
 ]
