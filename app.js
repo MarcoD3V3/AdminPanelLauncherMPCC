@@ -1533,7 +1533,26 @@ async function confirmGenerate() {
             body: JSON.stringify({ count, tags })
         });
         
-        if (!response.ok) throw new Error('Error al generar tokens');
+        if (!response.ok) {
+            // Intentar leer el mensaje de error del servidor
+            let errorMessage = 'Error al generar tokens';
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.error || errorMessage;
+            } catch (e) {
+                // Si no se puede parsear el JSON, usar mensaje según el código de estado
+                if (response.status === 429) {
+                    errorMessage = 'Demasiadas peticiones. Por favor, espera un momento antes de intentar nuevamente.';
+                } else if (response.status === 500) {
+                    errorMessage = 'Error interno del servidor. Por favor, intenta más tarde.';
+                } else if (response.status === 503) {
+                    errorMessage = 'Servicio temporalmente no disponible. Por favor, intenta más tarde.';
+                } else {
+                    errorMessage = `Error al generar tokens (${response.status})`;
+                }
+            }
+            throw new Error(errorMessage);
+        }
         
         const result = await response.json();
         showNotification(`${result.tokens.length} token(s) generado(s) exitosamente`, 'success');
@@ -1543,7 +1562,18 @@ async function confirmGenerate() {
         }
     } catch (error) {
         console.error('Error:', error);
-        showNotification('Error al generar tokens: ' + error.message, 'error');
+        // Manejar diferentes tipos de errores
+        let errorMsg;
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            errorMsg = 'Error de conexión. Verifica tu conexión a internet e intenta nuevamente.';
+        } else if (error.message.includes('Error al generar tokens')) {
+            errorMsg = error.message; // Ya tiene el mensaje completo
+        } else if (error.message === 'Failed to fetch' || error.message.includes('NetworkError')) {
+            errorMsg = 'Error de red. El servidor no está disponible. Por favor, intenta más tarde.';
+        } else {
+            errorMsg = `Error al generar tokens: ${error.message}`;
+        }
+        showNotification(errorMsg, 'error');
     }
 }
 
